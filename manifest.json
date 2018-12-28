@@ -1,0 +1,49 @@
+{
+  "id": "odbc",
+  "displayName": "ODBC plugin",
+  "description": "Publisher which pulls data from ODBC compliant data sources",
+  "versionDescription": "Version 1.0.0",
+  "version": "1.0.0",
+  "iconFile": "icon.png",
+  "executable": "plugin-odbc",
+  "kind": "publisher",
+  "os": "$GOOS",
+  "arch": "$GOARCH",
+  "canProduceMultipleSchemas": true,
+  "canAcceptQueryBasedSchemas": true,
+  "querySchema": {
+    "ui": {
+      "ui:widget": "code",
+      "ui:options": {
+        "language": "sql"
+      }
+    },
+    "schema": {
+      "type": "string"
+    }
+  },
+  "configSchema": {
+    "ui": {
+      "ui:order": ["connectionString", "password"],
+      "password": {
+        "ui:widget": "password"
+      }
+    },
+    "schema": {
+      "type": "object",
+      "properties": {
+        "connectionString": {
+          "type": "string",
+          "title": "Connection String",
+          "description": "The ODBC Connection string with PASSWORD in place for your connection secret"
+        },
+        "password": {
+          "type": "string",
+          "title": "Password",
+          "description": "The secret of your connection string. Will replace PASSWORD in the connection string"
+        }
+      },
+      "required": ["connectionString", "password"]
+    }
+  }
+}
