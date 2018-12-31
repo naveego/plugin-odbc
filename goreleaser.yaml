@@ -9,6 +9,7 @@ before:
 builds:
   - env:
       - CGO_ENABLED=1
+      - CGO_CPPFLAGS=-Wno-error
     main: main.go
     goos:
       #- darwin
