@@ -1,6 +1,6 @@
 {
   "id": "odbc",
-  "displayName": "ODBC plugin",
+  "displayName": "ODBC Publisher",
   "description": "Publisher which pulls data from ODBC compliant data sources",
   "versionDescription": "Version 1.0.0",
   "version": "1.0.0",
