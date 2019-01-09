@@ -35,15 +35,15 @@
         "connectionString": {
           "type": "string",
           "title": "Connection String",
-          "description": "The ODBC Connection string with PASSWORD in place for your connection secret"
+          "description": "The ODBC Connection string with (Optional) PASSWORD in place for your connection secret"
         },
         "password": {
           "type": "string",
           "title": "Password",
-          "description": "The secret of your connection string. Will replace PASSWORD in the connection string"
+          "description": "(Optional) The secret of your connection string. Will replace PASSWORD in the connection string"
         }
       },
-      "required": ["connectionString", "password"]
+      "required": ["connectionString"]
     }
   }
 }

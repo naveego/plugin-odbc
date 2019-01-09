@@ -27,7 +27,7 @@ func TestODBC(t *testing.T) {
 
 func GetTestSettings() *Settings {
 	return &Settings{
-		ConnectionString: "Driver={SQL Server};Server=localhost;Database=w3;Uid=sa;Pwd=PASSWORD;",
+		ConnectionString: "Driver={ODBC Driver 17 for SQL Server};Server=localhost;Database=w3;Uid=sa;Pwd=PASSWORD;",
 		Password:         "n5o_ADMIN",
 	}
 }

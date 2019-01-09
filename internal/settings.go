@@ -21,10 +21,6 @@ func (s *Settings) Validate() error {
 		return errors.New("the connectionString property must be set")
 	}
 
-	if s.Password == "" {
-		return errors.New("the password property must be set")
-	}
-
 	return nil
 }
 
