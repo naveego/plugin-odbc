@@ -8,11 +8,12 @@ before:
   # - go generate ./...
 builds:
   - env:
-    #- CGO_ENABLED=0
+      - CGO_ENABLED=1
+      - CGO_CPPFLAGS=-Wno-error
     main: main.go
     goos:
       #- darwin
-      #- linux
+      - linux
       - windows
     goarch:
       - amd64
