@@ -402,10 +402,6 @@ func (s *Server) readRecords(ctx context.Context, req *pub.PublishRequest, out c
 		return errors.Errorf("query cannot be empty")
 	}
 
-	if req.Limit > 0 {
-		query = fmt.Sprintf("select top(%d) * from (%s) as q", req.Limit, query)
-	}
-
 	rows, err := s.db.Query(query)
 	if err != nil {
 		return errors.Errorf("error executing query %q: %v", query, err)
