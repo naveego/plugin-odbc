@@ -415,7 +415,15 @@ func (s *Server) readRecords(ctx context.Context, req *pub.PublishRequest, out c
 	valueBuffer := make([]interface{}, len(properties))
 	mapBuffer := make(map[string]interface{}, len(properties))
 
+	rowsRead := uint32(0)
+
 	for rows.Next() {
+
+		rowsRead += 1
+		if req.Limit > 0 && rowsRead == req.Limit {
+			break
+		}
+
 		if ctx.Err() != nil || !s.connected {
 			return nil
 		}
