@@ -24,7 +24,7 @@
   },
   "configSchema": {
     "ui": {
-      "ui:order": ["connectionString", "password"],
+      "ui:order": ["ConnectionString", "Password"],
       "password": {
         "ui:widget": "password"
       }
@@ -32,12 +32,12 @@
     "schema": {
       "type": "object",
       "properties": {
-        "connectionString": {
+        "ConnectionString": {
           "type": "string",
           "title": "Connection String",
           "description": "The ODBC Connection string with (Optional) PASSWORD in place for your connection secret"
         },
-        "password": {
+        "Password": {
           "type": "string",
           "title": "Password",
           "description": "(Optional) The secret of your connection string. Will replace PASSWORD in the connection string"
