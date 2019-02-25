@@ -8,6 +8,5 @@ namespace PluginODBC.Helper
         public bool Connected { get; set; }
         public WriteSettings WriteSettings { get; set; }
         public bool WriteConfigured { get; set; }
-        public OdbcConnection DB { get; set; }
     }
 }

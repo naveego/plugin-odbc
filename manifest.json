@@ -2,6 +2,7 @@
   "id": "odbc",
   "displayName": "ODBC Publisher",
   "description": "Publisher which pulls data from ODBC compliant data sources",
+  "apiVersion": "2",
   "versionDescription": "Version 1.0.0",
   "version": "1.0.0",
   "iconFile": "icon.png",

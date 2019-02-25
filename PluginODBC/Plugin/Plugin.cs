@@ -1,12 +1,14 @@
 using System;
-using System.Collections;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.Odbc;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Grpc.Core;
 using Newtonsoft.Json;
 using PluginODBC.API;
-//using PluginODBC.DataContracts;
+using PluginODBC.DataContracts;
 using PluginODBC.Helper;
 using PluginODBC.Interfaces;
 using Pub;
@@ -27,7 +29,7 @@ namespace PluginODBC.Plugin
         }
 
         /// <summary>
-        /// Establishes a connection with Zoho CRM. Creates an authenticated http client and tests it.
+        /// Establishes a connection with an odbc data source
         /// </summary>
         /// <param name="request"></param>
         /// <param name="context"></param>
@@ -62,7 +64,7 @@ namespace PluginODBC.Plugin
             try
             {
                 _connService = _connFactory(_server.Settings);
-                _server.DB = _connService.MakeDbObject();
+                _connService.MakeDbObject();
             }
             catch (Exception e)
             {
@@ -116,7 +118,7 @@ namespace PluginODBC.Plugin
 
 
         /// <summary>
-        /// Discovers schemas located in the users Zoho CRM instance
+        /// Discovers schemas based on a query
         /// </summary>
         /// <param name="request"></param>
         /// <param name="context"></param>
@@ -129,12 +131,34 @@ namespace PluginODBC.Plugin
             DiscoverSchemasResponse discoverSchemasResponse = new DiscoverSchemasResponse();
 
             // only return requested schemas if refresh mode selected
-            if (request.Mode == DiscoverSchemasRequest.Types.Mode.Refresh)
+            if (request.Mode == DiscoverSchemasRequest.Types.Mode.All)
             {
-                
+                Logger.Info("Plugin does not support auto schema discovery.");
+                return discoverSchemasResponse;
             }
 
-            return discoverSchemasResponse;
+            try
+            {
+                var refreshSchemas = request.ToRefresh;
+            
+                Logger.Info($"Refresh schemas attempted: {refreshSchemas.Count}");
+            
+                var tasks = refreshSchemas.Select(GetSchemaProperties)
+                    .ToArray();
+
+                await Task.WhenAll(tasks);
+
+                discoverSchemasResponse.Schemas.AddRange(tasks.Where(x => x.Result != null).Select(x => x.Result));
+
+                // return all schemas 
+                Logger.Info($"Schemas returned: {discoverSchemasResponse.Schemas.Count}");
+                return discoverSchemasResponse;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e.Message);
+                throw;
+            }
         }
 
         /// <summary>
@@ -156,13 +180,223 @@ namespace PluginODBC.Plugin
             try
             {
                 var recordsCount = 0;
+                
+                // Check if query is empty
+                if (string.IsNullOrWhiteSpace(schema.Query))
+                {
+                    Logger.Info("Query not defined.");
+                    return;
+                }
 
+                // create new db connection and command
+                var connection = _connService.MakeDbObject();       
+                var command = new OdbcCommand(schema.Query, connection);
+                
+                // open the connection
+                connection.Open();
+                
+                // get a reader object for the query
+                var reader = command.ExecuteReader();
+
+                if (reader.HasRows)
+                {
+                    while (reader.Read() && _server.Connected)
+                    {
+                        // build record map
+                        var recordMap = new Dictionary<string, object>();
+
+                        foreach (var property in schema.Properties)
+                        {
+                            try
+                            {
+                                recordMap[property.Id] = reader[property.Id];
+                            }
+                            catch (Exception e)
+                            {
+                                Logger.Error($"No column with property Id: {property.Id}");
+                                Logger.Error(e.Message);
+                                recordMap[property.Id] = "";
+                            }
+                        }
+                    
+                        // create record
+                        var record = new Record
+                        {
+                            Action = Record.Types.Action.Upsert,
+                            DataJson = JsonConvert.SerializeObject(recordMap)
+                        };
+                    
+                        // stop publishing if the limit flag is enabled and the limit has been reached or the server is disconnected
+                        if ((limitFlag && recordsCount == limit) || !_server.Connected)
+                        {
+                            break;
+                        }
+
+                        // publish record
+                        await responseStream.WriteAsync(record);
+                        recordsCount++;
+                    }
+                }
+                
                 Logger.Info($"Published {recordsCount} records");
             }
             catch (Exception e)
             {
                 Logger.Error(e.Message);
                 throw;
+            }
+        }
+        
+        /// <summary>
+        /// Creates a form and handles form updates for write backs
+        /// </summary>
+        /// <param name="request"></param>
+        /// <param name="context"></param>
+        /// <returns></returns>
+        public override Task<ConfigureWriteResponse> ConfigureWrite(ConfigureWriteRequest request, ServerCallContext context)
+        {
+            var schemaJsonObj = new Dictionary<string, object>
+            {
+                {"type", "object"},
+                {"properties", new Dictionary<string, object>
+                {
+                    {"Query", new Dictionary<string, string>
+                    {
+                        {"type", "string"},
+                        {"title", "Query"},
+                        {"description", "Query to execute for write back with parameter place holders"},
+                    }},
+                    {"Parameters", new Dictionary<string, object>
+                    {
+                        {"type", "array"},
+                        {"title", "Parameters"},
+                        {"description", "Parameters to replace the place holders in the query"},
+                        {"items", new Dictionary<string, object>
+                        {
+                            {"type", "object"},
+                            {"properties", new Dictionary<string, object>
+                            {
+                                {"ParamName", new Dictionary<string, object>
+                                {
+                                    {"type", "string"},
+                                    {"title", "Name"}
+                                }},
+                                {"ParamType", new Dictionary<string, object>
+                                {
+                                    {"type", "string"},
+                                    {"title", "Type"},
+                                    {"enum", new []
+                                    {
+                                        "string", "bool", "int", "float", "decimal"
+                                    }},
+                                    {"enumNames", new []
+                                    {
+                                        "String", "Bool", "Int", "Float", "Decimal"
+                                    }},
+                                }},
+                            }},
+                            {"required", new []
+                            {
+                                "ParamName", "ParamType"
+                            }}
+                        }}
+                    }},
+                }},
+                {"required", new []
+                {
+                    "Query"
+                }}
+            };
+            
+            var uiJsonObj = new Dictionary<string, object>
+            {
+                {"ui:order", new []
+                {
+                    "Query", "Parameters"
+                }},
+                {"Query", new Dictionary<string, object>
+                {
+                    {"ui:widget", "code"},
+                    {"ui:options", new Dictionary<string, string>
+                    {
+                        {"language", "sql"}
+                    }}
+                }}
+            };
+
+            var schemaJson = JsonConvert.SerializeObject(schemaJsonObj);
+            var uiJson = JsonConvert.SerializeObject(uiJsonObj);
+            
+            // if first call 
+            if (request.Form == null || request.Form.DataJson == "")
+            {
+                return Task.FromResult(new ConfigureWriteResponse
+                {
+                    Form = new ConfigurationFormResponse
+                    {
+                        DataJson = "",
+                        DataErrorsJson = "",
+                        Errors = { },
+                        SchemaJson = schemaJson,
+                        UiJson = uiJson,
+                        StateJson = ""
+                    },
+                    Schema = null
+                });
+            }
+
+            try
+            {
+                // get form data
+                var formData = JsonConvert.DeserializeObject<ConfigureWriteFormData>(request.Form.DataJson);
+            
+                // base schema to return
+                var schema = new Schema
+                {
+                    Id = "",
+                    Query = formData.Query,
+                    DataFlowDirection = Schema.Types.DataFlowDirection.Write
+                };
+            
+                // add parameters to properties
+                foreach (var param in formData.Parameters)
+                {
+                    schema.Properties.Add(new Property
+                    {
+                        Id = param.ParamName,
+                        Name = param.ParamName,
+                        Type = GetWriteBackType(param.ParamType)
+                    });
+                }
+            
+                return Task.FromResult(new ConfigureWriteResponse
+                {
+                    Form = new ConfigurationFormResponse
+                    {
+                        DataJson = request.Form.DataJson,
+                        Errors = { },
+                        SchemaJson = schemaJson,
+                        UiJson = uiJson,
+                        StateJson = request.Form.StateJson
+                    },
+                    Schema = schema
+                });
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e.Message);
+                return Task.FromResult(new ConfigureWriteResponse
+                {
+                    Form = new ConfigurationFormResponse
+                    {
+                        DataJson = request.Form.DataJson,
+                        Errors = { e.Message },
+                        SchemaJson = schemaJson,
+                        UiJson = uiJson,
+                        StateJson = request.Form.StateJson
+                    },
+                    Schema = null
+                });
             }
         }
 
@@ -276,25 +510,77 @@ namespace PluginODBC.Plugin
         }
 
         /// <summary>
-        /// Gets a schema for a given module
+        /// Gets a schema for a given query
         /// </summary>
-        /// <param name="module"></param>
-        /// <returns>returns a schema or null if unavailable</returns>
-        private Task<Schema> GetSchemaForModule(string module)
+        /// <param name="schema"></param>
+        /// <returns>A schema or null</returns>
+        private Task<Schema> GetSchemaProperties(Schema schema)
         {
             try
             {
-                // base schema to be added to
-                var schema = new Schema
+                // Check if query is empty
+                if (string.IsNullOrWhiteSpace(schema.Query))
                 {
-                    Id = module,
-                    Name = module,
-                    Description = "",
-                    PublisherMetaJson = null,
-                    DataFlowDirection = Schema.Types.DataFlowDirection.ReadWrite
-                };
+                    return null;
+                }
 
-                return Task.FromResult(schema);
+                // create new db connection and command
+                var connection = _connService.MakeDbObject();       
+                var command = new OdbcCommand(schema.Query, connection);
+                
+                // open the connection
+                connection.Open();
+                
+                // get a reader object for the query
+                var reader = command.ExecuteReader();
+
+                // get metadata table object for reader
+                var schemaTable = reader.GetSchemaTable();
+                
+                if (schemaTable != null)
+                {
+                    // counter for unknown columns with no name
+                    var unnamedColIndex = 0;
+                    
+                    // get each column and create a property for the column
+                    foreach (DataColumn col in schemaTable.Columns)
+                    {
+                        // get the column name
+                        var colName = col.ColumnName;
+                        if (string.IsNullOrWhiteSpace(colName))
+                        {
+                            colName = $"UNKNOWN_{unnamedColIndex}";
+                            unnamedColIndex++;
+                        }
+                        
+                        // create property
+                        var property = new Property
+                        {
+                            Id = colName,
+                            Name = colName,
+                            Description = col.Caption,
+                            Type = GetPropertyType(col),
+                            TypeAtSource = col.DataType.ToString(),
+                            IsKey = col.Unique,
+                            IsNullable = col.AllowDBNull,
+                            IsCreateCounter = false,
+                            IsUpdateCounter = false,
+                            PublisherMetaJson = ""
+                        };
+                        
+                        // add property to schema
+                        schema.Properties.Add(property);
+                    }
+                }
+                else
+                {
+                    schema = null;
+                }
+                
+                reader.Close();
+                connection.Close();
+
+                return Task.FromResult(schema);             
             }
             catch (Exception e)
             {
@@ -304,51 +590,57 @@ namespace PluginODBC.Plugin
         }
 
         /// <summary>
-        /// Gets the property type of a value
+        /// Gets the property type of a column
         /// </summary>
-        /// <param name="value"></param>
+        /// <param name="col"></param>
         /// <returns></returns>
-        private PropertyType GetPropertyType(dynamic value)
+        private PropertyType GetPropertyType(DataColumn col)
         {
-            try
+            var type = col.DataType;
+            switch (true)
             {
-                // try datetime
-                if (DateTime.TryParse(value, out DateTime d))
-                {
-                    return PropertyType.Date;
-                }
-
-                // try int
-                if (Int32.TryParse(value, out int i))
-                {
-                    return PropertyType.Integer;
-                }
-
-                // try float
-                if (float.TryParse(value, out float f))
-                {
-                    return PropertyType.Float;
-                }
-
-                // try boolean
-                if (bool.TryParse(value, out bool b))
-                {
+                case bool _ when type == typeof(bool):
                     return PropertyType.Bool;
-                }
-
-                // default return string
-                return PropertyType.String;
+                case bool _ when type == typeof(int):
+                case bool _ when type == typeof(long):
+                    return PropertyType.Integer;
+                case bool _ when type == typeof(float):
+                case bool _ when type == typeof(double):
+                    return PropertyType.Float;
+                case bool _ when type == typeof(DateTime):
+                    return PropertyType.Datetime;
+                case bool _ when type == typeof(string):
+                    if (col.MaxLength > 1024)
+                    {
+                        return PropertyType.Text;
+                    }
+                    return PropertyType.String;
+                default:
+                    return PropertyType.String;
             }
-            catch (Exception e)
-            {
-                // try object or array
-                if (value is IEnumerable)
-                {
-                    return PropertyType.Json;
-                }
+        }
 
-                Logger.Error(e.Message);
-                throw;
+        /// <summary>
+        /// Gets the property type for the provided write back type from form
+        /// </summary>
+        /// <param name="type"></param>
+        /// <returns></returns>
+        private PropertyType GetWriteBackType(string type)
+        {
+            switch (type)
+            {
+                case "string":
+                    return PropertyType.String;
+                case "bool":
+                    return PropertyType.Bool;
+                case "int":
+                    return PropertyType.String;
+                case "float":
+                    return PropertyType.Float;
+                case "decimal":
+                    return PropertyType.Decimal;
+                default:
+                    return PropertyType.String;
             }
         }
 
@@ -360,7 +652,66 @@ namespace PluginODBC.Plugin
         /// <returns></returns>
         private Task<string> PutRecord(Schema schema, Record record)
         {
-            return Task.FromResult("");
+            try
+            {
+                // Check if query is empty
+                if (string.IsNullOrWhiteSpace(schema.Query))
+                {
+                    return Task.FromResult("Query not defined.");
+                }
+                
+                var recObj = JsonConvert.DeserializeObject<Dictionary<string, object>>(record.DataJson);
+
+                // create new db connection and command
+                var connection = _connService.MakeDbObject();       
+                var command = new OdbcCommand(schema.Query, connection);
+                
+                // add parameters
+                foreach (var property in schema.Properties)
+                {
+                    // set odbc type, name, and value to parameter
+                    OdbcType type;
+                    switch (property.Type)
+                    {
+                        case PropertyType.String:
+                            type = OdbcType.VarChar;
+                            break;
+                        case PropertyType.Bool:
+                            type = OdbcType.Bit;
+                            break;
+                        case PropertyType.Integer:
+                            type = OdbcType.Int;
+                            break;
+                        case PropertyType.Float:
+                            type = OdbcType.Double;
+                            break;
+                        case PropertyType.Decimal:
+                            type = OdbcType.Decimal;
+                            break;
+                        default:
+                            type = OdbcType.VarChar;
+                            break;
+                    }
+                    
+                    var param = command.Parameters.Add(property.Id, type);
+                    param.Value = recObj[property.Id];
+                }
+                
+                // open the connection
+                connection.Open();
+                
+                // get a reader object for the query
+                var reader = command.ExecuteReader();
+                
+                Logger.Info($"Modified {reader.RecordsAffected} records.");
+                
+                return Task.FromResult("");
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e.Message);
+                return Task.FromResult(e.Message);
+            }
         }
     }
 }
