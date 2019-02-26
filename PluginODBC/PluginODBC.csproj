@@ -3,6 +3,8 @@
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <TargetFramework>netcoreapp2.2</TargetFramework>
+        <RootNamespace>PluginODBC</RootNamespace>
+        <RuntimeIdentifiers>win-x64;linux-x64;osx-x64</RuntimeIdentifiers>
     </PropertyGroup>
 
     <ItemGroup>
@@ -18,4 +20,40 @@
       <PackageReference Include="System.Data.Odbc" Version="4.5.0" />
     </ItemGroup>
 
+    <ItemGroup>
+        <RuntimeHostConfigurationOption Include="System.Globalization.Invariant" Value="true" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Icon Include="$(MSBuildProjectDirectory)/../icon.png" />
+        <License Include="$(MSBuildProjectDirectory)/../LICENSE" />
+        <Manifest Include="$(MSBuildProjectDirectory)/../manifest.json" />
+    </ItemGroup>
+
+    <Target Name="ZipWindows" AfterTargets="Publish" Condition="$(Configuration) == 'Release' And Exists('$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\win-x64\publish')">
+        <Copy SourceFiles="@(Icon)" DestinationFolder="$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\win-x64\publish" />
+        <Copy SourceFiles="@(Manifest)" DestinationFolder="$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\win-x64\publish" />
+        <Copy SourceFiles="@(License)" DestinationFolder="$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\win-x64\publish" />
+        <Delete Files="$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\win-x64\plugin-odbc_1.0.0_windows_amd64.zip" />
+        <ZipDirectory SourceDirectory="$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\win-x64\publish" DestinationFile="$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\win-x64\plugin-odbc_1.0.0_windows_amd64.zip" />
+    </Target>
+    <Target Name="ZipOSX" AfterTargets="Publish" Condition="$(Configuration) == 'Release' And Exists('$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\osx-x64\publish')">
+        <Copy SourceFiles="@(Icon)" DestinationFolder="$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\osx-x64\publish" />
+        <Copy SourceFiles="@(Manifest)" DestinationFolder="$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\osx-x64\publish" />
+        <Copy SourceFiles="@(License)" DestinationFolder="$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\osx-x64\publish" />
+        <Delete Files="$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\osx-x64\plugin-odbc_1.0.0_darwin_amd64.zip" />
+        <ZipDirectory SourceDirectory="$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\osx-x64\publish" DestinationFile="$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\osx-x64\plugin-odbc_1.0.0_darwin_amd64.zip" />
+    </Target>
+    <Target Name="ZipLinux" AfterTargets="Publish" Condition="$(Configuration) == 'Release' And Exists('$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\linux-x64\publish')">
+        <Copy SourceFiles="@(Icon)" DestinationFolder="$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\linux-x64\publish" />
+        <Copy SourceFiles="@(Manifest)" DestinationFolder="$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\linux-x64\publish" />
+        <Copy SourceFiles="@(License)" DestinationFolder="$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\linux-x64\publish" />
+        <Delete Files="$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\linux-x64\plugin-odbc_1.0.0_linux_amd64.zip" />
+        <ZipDirectory SourceDirectory="$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\linux-x64\publish" DestinationFile="$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\linux-x64\plugin-odbc_1.0.0_linux_amd64.zip" />
+    </Target>
+    <Target Name="CleanZip" AfterTargets="Clean">
+        <Delete Files="$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\win-x64\plugin-odbc_1.0.0_windows_amd64.zip" />
+        <Delete Files="$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\osx-x64\plugin-odbc_1.0.0_darwin_amd64" />
+        <Delete Files="$(MSBuildProjectDirectory)\bin\Release\netcoreapp2.2\linux-x64\plugin-odbc_1.0.0_linux_amd64.zip" />
+    </Target>
 </Project>
