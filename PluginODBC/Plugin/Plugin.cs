@@ -67,6 +67,7 @@ namespace PluginODBC.Plugin
                 var connection = _connService.MakeConnectionObject();
                 connection.Open();
                 connection.Close();
+                _server.Connected = true;
             }
             catch (Exception e)
             {
@@ -414,6 +415,7 @@ namespace PluginODBC.Plugin
                 var schema = new Schema
                 {
                     Id = "",
+                    Name = "",
                     Query = formData.Query,
                     DataFlowDirection = Schema.Types.DataFlowDirection.Write
                 };
@@ -695,7 +697,7 @@ namespace PluginODBC.Plugin
                 case "bool":
                     return PropertyType.Bool;
                 case "int":
-                    return PropertyType.String;
+                    return PropertyType.Integer;
                 case "float":
                     return PropertyType.Float;
                 case "decimal":
@@ -754,7 +756,7 @@ namespace PluginODBC.Plugin
                             break;
                     }
                     
-                    var param = command.Parameters.Add(property.Id, type);
+                    var param = command.AddParameter(property.Id, type);
                     param.Value = recObj[property.Id];
                 }
                 

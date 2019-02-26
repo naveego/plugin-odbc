@@ -5,6 +5,6 @@ namespace PluginODBC.Interfaces
     public interface ICommandService
     {
         IReaderService ExecuteReader();
-        OdbcParameterCollection Parameters { get; }
+        OdbcParameter AddParameter(string parameterName, OdbcType odbcType);
     }
 }

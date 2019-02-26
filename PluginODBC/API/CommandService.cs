@@ -18,5 +18,10 @@ namespace PluginODBC.API
         {
             return new ReaderService(_command.ExecuteReader());
         }
+
+        public OdbcParameter AddParameter(string parameterName, OdbcType odbcType)
+        {
+            return _command.Parameters.Add(parameterName, odbcType);
+        }
     }
 }
