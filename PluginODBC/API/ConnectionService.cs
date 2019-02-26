@@ -1,22 +1,25 @@
 using System.Data.Odbc;
-using PluginODBC.Helper;
 using PluginODBC.Interfaces;
 
 namespace PluginODBC.API
 {
     public class ConnectionService : IConnectionService
     {
-        private readonly Settings _settings;
-        
-        public ConnectionService(Settings settings)
+        public OdbcConnection Connection { get; }
+
+        public ConnectionService(OdbcConnection connection)
         {
-            _settings = settings;
+            Connection = connection;
+        }
+
+        public void Open()
+        {
+            Connection.Open();
         }
         
-        public OdbcConnection MakeDbObject()
+        public void Close()
         {
-            var connString = _settings.GetConnectionString();
-            return new OdbcConnection(connString);
+            Connection.Close();
         }
     }
 }

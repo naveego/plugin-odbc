@@ -4,6 +4,9 @@ namespace PluginODBC.Interfaces
 {
     public interface IConnectionService
     {
-        OdbcConnection MakeDbObject();
+        void Open();
+        void Close();
+
+        OdbcConnection Connection { get; }
     }
 }

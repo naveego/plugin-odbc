@@ -17,14 +17,14 @@ namespace PluginODBC.Plugin
 {
     public class Plugin : Publisher.PublisherBase
     {
-        private readonly Func<Settings, IConnectionService> _connFactory;
+        private readonly Func<Settings, IConnectionFactoryService> _connFactory;
         private readonly ServerStatus _server;
         private TaskCompletionSource<bool> _tcs;
-        private IConnectionService _connService;
+        private IConnectionFactoryService _connService;
 
-        public Plugin(Func<Settings, IConnectionService> connFactory = null)
+        public Plugin(Func<Settings, IConnectionFactoryService> connFactory = null)
         {
-            _connFactory = connFactory ?? (s => new ConnectionService(s));
+            _connFactory = connFactory ?? (s => new ConnectionFactoryService(s));
             _server = new ServerStatus();
         }
 
@@ -64,7 +64,9 @@ namespace PluginODBC.Plugin
             try
             {
                 _connService = _connFactory(_server.Settings);
-                _connService.MakeDbObject();
+                var connection = _connService.MakeConnectionObject();
+                connection.Open();
+                connection.Close();
             }
             catch (Exception e)
             {
@@ -177,6 +179,33 @@ namespace PluginODBC.Plugin
 
             Logger.Info($"Publishing records for schema: {schema.Name}");
 
+            // pre publish query
+            try
+            {
+                // Check if query is empty
+                if (!string.IsNullOrWhiteSpace(_server.Settings.PrePublishQuery))
+                {
+                    // create new db connection and command
+                    var connection = _connService.MakeConnectionObject();       
+                    var command = _connService.MakeCommandObject(_server.Settings.PrePublishQuery, connection);
+                
+                    // open the connection
+                    connection.Open();
+                
+                    // execute query
+                    var reader = command.ExecuteReader();
+                    
+                    // close reader and connection
+                    reader.Close();
+                    connection.Close();
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e.Message);
+                throw;
+            }
+
             try
             {
                 var recordsCount = 0;
@@ -189,8 +218,8 @@ namespace PluginODBC.Plugin
                 }
 
                 // create new db connection and command
-                var connection = _connService.MakeDbObject();       
-                var command = new OdbcCommand(schema.Query, connection);
+                var connection = _connService.MakeConnectionObject();       
+                var command = _connService.MakeCommandObject(schema.Query, connection);
                 
                 // open the connection
                 connection.Open();
@@ -238,7 +267,38 @@ namespace PluginODBC.Plugin
                     }
                 }
                 
+                // close reader and connection
+                reader.Close();
+                connection.Close();
+                
                 Logger.Info($"Published {recordsCount} records");
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e.Message);
+                throw;
+            }
+            
+            // post publish query
+            try
+            {
+                // Check if query is empty
+                if (!string.IsNullOrWhiteSpace(_server.Settings.PostPublishQuery))
+                {
+                    // create new db connection and command
+                    var connection = _connService.MakeConnectionObject();       
+                    var command = _connService.MakeCommandObject(_server.Settings.PostPublishQuery, connection);
+                
+                    // open the connection
+                    connection.Open();
+                
+                    // execute query
+                    var reader = command.ExecuteReader();
+                    
+                    // close reader and connection
+                    reader.Close();
+                    connection.Close();
+                }
             }
             catch (Exception e)
             {
@@ -525,8 +585,8 @@ namespace PluginODBC.Plugin
                 }
 
                 // create new db connection and command
-                var connection = _connService.MakeDbObject();       
-                var command = new OdbcCommand(schema.Query, connection);
+                var connection = _connService.MakeConnectionObject();       
+                var command = _connService.MakeCommandObject(schema.Query, connection);
                 
                 // open the connection
                 connection.Open();
@@ -577,6 +637,7 @@ namespace PluginODBC.Plugin
                     schema = null;
                 }
                 
+                // close reader and connection
                 reader.Close();
                 connection.Close();
 
@@ -663,8 +724,8 @@ namespace PluginODBC.Plugin
                 var recObj = JsonConvert.DeserializeObject<Dictionary<string, object>>(record.DataJson);
 
                 // create new db connection and command
-                var connection = _connService.MakeDbObject();       
-                var command = new OdbcCommand(schema.Query, connection);
+                var connection = _connService.MakeConnectionObject();       
+                var command = _connService.MakeCommandObject(schema.Query, connection);
                 
                 // add parameters
                 foreach (var property in schema.Properties)
@@ -704,6 +765,10 @@ namespace PluginODBC.Plugin
                 var reader = command.ExecuteReader();
                 
                 Logger.Info($"Modified {reader.RecordsAffected} records.");
+                
+                // close reader and connection
+                reader.Close();
+                connection.Close();
                 
                 return Task.FromResult("");
             }
