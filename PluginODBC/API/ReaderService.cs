@@ -10,6 +10,7 @@ namespace PluginODBC.API
 
         public bool HasRows => _reader.HasRows;
         public int RecordsAffected => _reader.RecordsAffected;
+        public int FieldCount => _reader.FieldCount;
         public object this[string index] => _reader[index];
 
         public ReaderService(OdbcDataReader reader)

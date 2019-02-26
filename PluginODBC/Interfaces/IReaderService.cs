@@ -9,6 +9,7 @@ namespace PluginODBC.Interfaces
         void Close();
         int RecordsAffected { get; }
         bool HasRows { get; }
+        int FieldCount { get; }
         object this[string value] { get; }
     }
 }

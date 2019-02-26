@@ -605,31 +605,31 @@ namespace PluginODBC.Plugin
                     var unnamedColIndex = 0;
                     
                     // get each column and create a property for the column
-                    foreach (DataColumn col in schemaTable.Columns)
+                    foreach (DataRow row in schemaTable.Rows)
                     {
                         // get the column name
-                        var colName = col.ColumnName;
+                        var colName = row["ColumnName"].ToString();
                         if (string.IsNullOrWhiteSpace(colName))
                         {
                             colName = $"UNKNOWN_{unnamedColIndex}";
                             unnamedColIndex++;
                         }
-                        
+                    
                         // create property
                         var property = new Property
                         {
                             Id = colName,
                             Name = colName,
-                            Description = col.Caption,
-                            Type = GetPropertyType(col),
-                            TypeAtSource = col.DataType.ToString(),
-                            IsKey = col.Unique,
-                            IsNullable = col.AllowDBNull,
+                            Description = "",
+                            Type = GetPropertyType(row),
+                            TypeAtSource = row["DataType"].ToString(),
+                            IsKey = Boolean.Parse(row["IsKey"].ToString()),
+                            IsNullable = Boolean.Parse(row["AllowDBNull"].ToString()),
                             IsCreateCounter = false,
                             IsUpdateCounter = false,
                             PublisherMetaJson = ""
                         };
-                        
+                    
                         // add property to schema
                         schema.Properties.Add(property);
                     }
@@ -657,9 +657,9 @@ namespace PluginODBC.Plugin
         /// </summary>
         /// <param name="col"></param>
         /// <returns></returns>
-        private PropertyType GetPropertyType(DataColumn col)
+        private PropertyType GetPropertyType(DataRow col)
         {
-            var type = col.DataType;
+            var type = Type.GetType(col["DataType"].ToString());
             switch (true)
             {
                 case bool _ when type == typeof(bool):
@@ -673,7 +673,7 @@ namespace PluginODBC.Plugin
                 case bool _ when type == typeof(DateTime):
                     return PropertyType.Datetime;
                 case bool _ when type == typeof(string):
-                    if (col.MaxLength > 1024)
+                    if (Int64.Parse(col["ColumnSize"].ToString()) > 1024)
                     {
                         return PropertyType.Text;
                     }

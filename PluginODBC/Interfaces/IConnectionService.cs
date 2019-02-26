@@ -1,3 +1,4 @@
+using System.Data;
 using System.Data.Odbc;
 
 namespace PluginODBC.Interfaces
@@ -6,7 +7,7 @@ namespace PluginODBC.Interfaces
     {
         void Open();
         void Close();
-
+        DataTable GetSchema();
         OdbcConnection Connection { get; }
     }
 }

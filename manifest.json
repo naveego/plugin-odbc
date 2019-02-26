@@ -12,6 +12,8 @@
   "arch": "$GOARCH",
   "canProduceMultipleSchemas": true,
   "canAcceptQueryBasedSchemas": true,
+  "canConfigureWrite": true,
+  "canWrite": true,
   "querySchema": {
     "ui": {
       "ui:widget": "code",
@@ -26,7 +28,7 @@
   "configSchema": {
     "ui": {
       "ui:order": ["ConnectionString", "Password", "PrePublishQuery", "PostPublishQuery"],
-      "password": {
+      "Password": {
         "ui:widget": "password"
       },
       "PrePublishQuery": {
@@ -60,7 +62,7 @@
           "description": "(Optional) Query to be run after a read completes."
         }
       },
-      "required": ["connectionString"]
+      "required": ["ConnectionString"]
     }
   }
 }

@@ -20,7 +20,7 @@ namespace PluginODBCTest.Plugin
     public class PluginTest
     {
         private readonly Mock<IConnectionService> _mockOdbcConnection = new Mock<IConnectionService>();
-        
+
         private ConnectRequest GetConnectSettings()
         {
             return new ConnectRequest
@@ -37,15 +37,15 @@ namespace PluginODBCTest.Plugin
             return cs =>
             {
                 var mockService = new Mock<IConnectionFactoryService>();
-                
+
                 mockService.Setup(m => m.MakeConnectionObject())
                     .Returns(_mockOdbcConnection.Object);
-                
+
                 mockService.Setup(m => m.MakeCommandObject("DiscoverSchemas", _mockOdbcConnection.Object))
                     .Returns(() =>
                     {
                         var mockOdbcCommand = new Mock<ICommandService>();
-                        
+
                         mockOdbcCommand.Setup(c => c.ExecuteReader())
                             .Returns(() =>
                             {
@@ -55,31 +55,50 @@ namespace PluginODBCTest.Plugin
                                     .Returns(() =>
                                     {
                                         var mockSchemaTable = new DataTable();
-                                        
-                                        var mockCol = new DataColumn
-                                        {
-                                            ColumnName = "TestCol",
-                                            Caption = "Caption",
-                                            Unique = true,
-                                            AllowDBNull = false,
-                                            DataType = Type.GetType("System.Int64")
-                                        };
-                                        mockSchemaTable.Columns.Add(mockCol);
-                                        
+                                        mockSchemaTable.Columns.AddRange(new[]
+                                            {
+                                                new DataColumn
+                                                {
+                                                    ColumnName = "ColumnName"
+                                                },
+                                                new DataColumn
+                                                {
+                                                    ColumnName = "DataType"
+                                                },
+                                                new DataColumn
+                                                {
+                                                    ColumnName = "IsKey"
+                                                },
+                                                new DataColumn
+                                                {
+                                                    ColumnName = "AllowDBNull"
+                                                },
+                                            }
+                                        );
+
+                                        var mockRow = mockSchemaTable.NewRow();
+                                        mockRow["ColumnName"] = "TestCol";
+                                        mockRow["DataType"] = "System.Int64";
+                                        mockRow["IsKey"] = true;
+                                        mockRow["AllowDBNull"] = false;
+
+                                        mockSchemaTable.Rows.Add(mockRow);
+
+
                                         return mockSchemaTable;
                                     });
-                                
+
                                 return mockReader.Object;
                             });
-                        
+
                         return mockOdbcCommand.Object;
                     });
-                
+
                 mockService.Setup(m => m.MakeCommandObject("ReadStream", _mockOdbcConnection.Object))
                     .Returns(() =>
                     {
                         var mockOdbcCommand = new Mock<ICommandService>();
-                        
+
                         mockOdbcCommand.Setup(c => c.ExecuteReader())
                             .Returns(() =>
                             {
@@ -88,7 +107,7 @@ namespace PluginODBCTest.Plugin
                                 mockReader.Setup(r => r.HasRows)
                                     .Returns(true);
 
-                                var readToggle = new List<bool>{true, true, false};
+                                var readToggle = new List<bool> {true, true, false};
                                 var readIndex = 0;
                                 mockReader.Setup(r => r.Read())
                                     .Returns(() => readToggle[readIndex])
@@ -96,18 +115,18 @@ namespace PluginODBCTest.Plugin
 
                                 mockReader.Setup(r => r["TestCol"])
                                     .Returns("data");
-                                
+
                                 return mockReader.Object;
                             });
-                        
+
                         return mockOdbcCommand.Object;
                     });
-                
+
                 mockService.Setup(m => m.MakeCommandObject("WriteStream", _mockOdbcConnection.Object))
                     .Returns(() =>
                     {
                         var mockOdbcCommand = new Mock<ICommandService>();
-                        
+
                         mockOdbcCommand.Setup(c => c.ExecuteReader())
                             .Returns(() =>
                             {
@@ -115,20 +134,20 @@ namespace PluginODBCTest.Plugin
 
                                 mockReader.Setup(r => r.RecordsAffected)
                                     .Returns(1);
-                                
+
                                 return mockReader.Object;
                             });
 
-                        mockOdbcCommand.Setup(c => c.AddParameter("TestCol",OdbcType.Int))
+                        mockOdbcCommand.Setup(c => c.AddParameter("TestCol", OdbcType.Int))
                             .Returns(new OdbcParameter());
-                        
+
                         return mockOdbcCommand.Object;
                     });
 
                 return mockService.Object;
             };
         }
-        
+
         private Schema GetTestSchema(string query)
         {
             return new Schema
@@ -138,7 +157,7 @@ namespace PluginODBCTest.Plugin
                 Query = query
             };
         }
-        
+
         private List<Record> GetTestRecords()
         {
             return new List<Record>
@@ -155,7 +174,7 @@ namespace PluginODBCTest.Plugin
                 }
             };
         }
-        
+
         [Fact]
         public async Task ConnectSessionTest()
         {
@@ -222,7 +241,7 @@ namespace PluginODBCTest.Plugin
             await channel.ShutdownAsync();
             await server.ShutdownAsync();
         }
-        
+
         [Fact]
         public async Task DiscoverSchemasAllTest()
         {
@@ -258,7 +277,7 @@ namespace PluginODBCTest.Plugin
             await channel.ShutdownAsync();
             await server.ShutdownAsync();
         }
-        
+
         [Fact]
         public async Task DiscoverSchemasRefreshTest()
         {
@@ -290,7 +309,7 @@ namespace PluginODBCTest.Plugin
             // assert
             Assert.IsType<DiscoverSchemasResponse>(response);
             Assert.Single(response.Schemas);
-            
+
             var schema = response.Schemas[0];
             Assert.Equal("test", schema.Id);
             Assert.Equal("test", schema.Name);
@@ -299,16 +318,16 @@ namespace PluginODBCTest.Plugin
             var property = schema.Properties[0];
             Assert.Equal("TestCol", property.Id);
             Assert.Equal("TestCol", property.Name);
-            Assert.Equal("Caption", property.Description);
+            Assert.Equal("", property.Description);
             Assert.Equal(PropertyType.Integer, property.Type);
             Assert.True(property.IsKey);
             Assert.False(property.IsNullable);
-            
+
             // cleanup
             await channel.ShutdownAsync();
             await server.ShutdownAsync();
         }
-        
+
         [Fact]
         public async Task ReadStreamTest()
         {
@@ -350,7 +369,7 @@ namespace PluginODBCTest.Plugin
             await channel.ShutdownAsync();
             await server.ShutdownAsync();
         }
-        
+
         [Fact]
         public async Task ReadStreamLimitTest()
         {
@@ -393,7 +412,7 @@ namespace PluginODBCTest.Plugin
             await channel.ShutdownAsync();
             await server.ShutdownAsync();
         }
-        
+
         [Fact]
         public async Task PrepareWriteTest()
         {
@@ -429,7 +448,7 @@ namespace PluginODBCTest.Plugin
             await channel.ShutdownAsync();
             await server.ShutdownAsync();
         }
-        
+
         [Fact]
         public async Task WriteStreamTest()
         {
@@ -463,13 +482,13 @@ namespace PluginODBCTest.Plugin
             };
 
             var records = GetTestRecords();
-            
+
             var recordAcks = new List<RecordAck>();
 
             // act
             client.Connect(connectRequest);
             client.PrepareWrite(prepareRequest);
-            
+
             using (var call = client.WriteStream())
             {
                 var responseReaderTask = Task.Run(async () =>
@@ -485,22 +504,23 @@ namespace PluginODBCTest.Plugin
                 {
                     await call.RequestStream.WriteAsync(record);
                 }
+
                 await call.RequestStream.CompleteAsync();
                 await responseReaderTask;
             }
 
             // assert
             Assert.Equal(2, recordAcks.Count);
-            Assert.Equal("",recordAcks[0].Error);
-            Assert.Equal("test",recordAcks[0].CorrelationId);
-            Assert.Equal("",recordAcks[1].Error);
-            Assert.Equal("more-test",recordAcks[1].CorrelationId);
+            Assert.Equal("", recordAcks[0].Error);
+            Assert.Equal("test", recordAcks[0].CorrelationId);
+            Assert.Equal("", recordAcks[1].Error);
+            Assert.Equal("more-test", recordAcks[1].CorrelationId);
 
             // cleanup
             await channel.ShutdownAsync();
             await server.ShutdownAsync();
         }
-        
+
         [Fact]
         public async Task ConfigureWriteTest()
         {
@@ -527,12 +547,13 @@ namespace PluginODBCTest.Plugin
                     StateJson = ""
                 }
             };
-            
+
             var secondRequest = new ConfigureWriteRequest()
             {
                 Form = new ConfigurationFormRequest
                 {
-                    DataJson = "{\"Query\":\"ConfigureWrite\",\"Parameters\":[{\"ParamName\":\"Name\",\"ParamType\":\"int\"}]}",
+                    DataJson =
+                        "{\"Query\":\"ConfigureWrite\",\"Parameters\":[{\"ParamName\":\"Name\",\"ParamType\":\"int\"}]}",
                     StateJson = ""
                 }
             };
@@ -547,7 +568,7 @@ namespace PluginODBCTest.Plugin
             Assert.NotNull(firstResponse.Form.SchemaJson);
             Assert.NotNull(firstResponse.Form.UiJson);
             Assert.Null(firstResponse.Schema);
-            
+
             Assert.IsType<ConfigureWriteResponse>(secondResponse);
             Assert.NotNull(secondResponse.Form.SchemaJson);
             Assert.NotNull(secondResponse.Form.UiJson);
@@ -557,7 +578,7 @@ namespace PluginODBCTest.Plugin
             Assert.Equal("ConfigureWrite", secondResponse.Schema.Query);
             Assert.Equal(Schema.Types.DataFlowDirection.Write, secondResponse.Schema.DataFlowDirection);
             Assert.Single(secondResponse.Schema.Properties);
-            
+
             var property = secondResponse.Schema.Properties[0];
             Assert.Equal("Name", property.Id);
             Assert.Equal("Name", property.Name);
