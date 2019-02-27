@@ -23,5 +23,10 @@ namespace PluginODBC.API
         {
             return _command.Parameters.Add(parameterName, odbcType);
         }
+
+        public void Prepare()
+        {
+            _command.Prepare();
+        }
     }
 }

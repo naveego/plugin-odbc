@@ -377,11 +377,7 @@ namespace PluginODBC.Plugin
                 }},
                 {"Query", new Dictionary<string, object>
                 {
-                    {"ui:widget", "code"},
-                    {"ui:options", new Dictionary<string, string>
-                    {
-                        {"language", "sql"}
-                    }}
+                    {"ui:widget", "textarea"}
                 }}
             };
 
@@ -503,7 +499,7 @@ namespace PluginODBC.Plugin
                 var outCount = 0;
 
                 // get next record to publish while connected and configured
-                while (await requestStream.MoveNext(CancellationToken.None) && _server.Connected &&
+                while (await requestStream.MoveNext(context.CancellationToken) && _server.Connected &&
                        _server.WriteConfigured)
                 {
                     var record = requestStream.Current;
@@ -559,6 +555,7 @@ namespace PluginODBC.Plugin
             // clear connection
             _server.Connected = false;
             _server.Settings = null;
+            _server.WriteSettings = null;
 
             // alert connection session to close
             if (_tcs != null)
@@ -764,6 +761,7 @@ namespace PluginODBC.Plugin
                 connection.Open();
                 
                 // get a reader object for the query
+                command.Prepare();
                 var reader = command.ExecuteReader();
                 
                 Logger.Info($"Modified {reader.RecordsAffected} records.");
