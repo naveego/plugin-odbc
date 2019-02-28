@@ -316,6 +316,8 @@ namespace PluginODBC.Plugin
         /// <returns></returns>
         public override Task<ConfigureWriteResponse> ConfigureWrite(ConfigureWriteRequest request, ServerCallContext context)
         {
+            Logger.Info("Configuring write...");
+            
             var schemaJsonObj = new Dictionary<string, object>
             {
                 {"type", "object"},
@@ -466,6 +468,7 @@ namespace PluginODBC.Plugin
         /// <returns></returns>
         public override Task<PrepareWriteResponse> PrepareWrite(PrepareWriteRequest request, ServerCallContext context)
         {
+            Logger.Info("Preparing write...");
             _server.WriteConfigured = false;
 
             var writeSettings = new WriteSettings
@@ -477,6 +480,7 @@ namespace PluginODBC.Plugin
             _server.WriteSettings = writeSettings;
             _server.WriteConfigured = true;
 
+            Logger.Info("Write prepared.");
             return Task.FromResult(new PrepareWriteResponse());
         }
 
