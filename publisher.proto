@@ -1,0 +1,484 @@
+syntax = "proto3";
+package pub;
+
+service Publisher {
+    // Configures the plugin.
+    rpc Configure (ConfigureRequest) returns (ConfigureResponse) {
+    }
+
+    // Instructs the plugin to connect to its data source.
+    rpc Connect (ConnectRequest) returns (ConnectResponse) {
+    }
+
+    // Instructs the plugin to connect to its data source
+    // and maintain a session where any change in the connection state
+    // or updates to OAuth information are streamed back to the host.
+    // The plugin should maintain this connection until Disconnect is called.
+    // This must be implemented if the plugin manifest has `canUseOAuth` set to true.
+    rpc ConnectSession (ConnectRequest) returns (stream ConnectResponse) {
+    }
+
+    // (DEPRECATED) Requests a listing of schemas this publisher can provide records for.
+    rpc DiscoverShapes (DiscoverSchemasRequest) returns (DiscoverSchemasResponse) {
+        option deprecated = true;
+    }
+
+    // Requests a listing of schemas this publisher can provide records for.
+    rpc DiscoverSchemas (DiscoverSchemasRequest) returns (DiscoverSchemasResponse) {
+    }
+
+    // (DEPRECATED) PublishStream begins streaming records to the client from the plugin.
+    rpc PublishStream (ReadRequest) returns (stream Record) {
+        option deprecated = true;
+    }
+
+    // ReadStream begins streaming records to the client from the plugin.
+    rpc ReadStream (ReadRequest) returns (stream Record) {
+    }
+
+    // Tells the plugin to disconnect from its data source, stop any running publishes,
+    // and gracefully prepare to be shut down.
+    rpc Disconnect (DisconnectRequest) returns (DisconnectResponse) {
+    }
+
+    // Configures a connection which can be used to connect to a data source.
+    // This must be implemented if the plugin manifest has `canConfigureConnection` set to true.
+    // This is an alternative to having a `configSchema` element in the manifest.
+    rpc ConfigureConnection (ConfigureConnectionRequest) returns (ConfigureConnectionResponse) {
+    }
+
+    // Configures a query which can be used to publish a schema.
+    // This must be implemented if the plugin manifest has `canConfigureQuery` set to true.
+    rpc ConfigureQuery (ConfigureQueryRequest) returns (ConfigureQueryResponse) {
+    }
+
+    // Configures settings for real time publishing (change detection).
+    // This must be implemented if the plugin manifest has `canPublishRealTime` set to true.
+    rpc ConfigureRealTime (ConfigureRealTimeRequest) returns (ConfigureRealTimeResponse) {
+    }
+
+    // Invoked to begin an OAuth flow. This must be implemented if the plugin 
+    // manifest has `canUseOAuth` set to true.
+    rpc BeginOAuthFlow (BeginOAuthFlowRequest) returns (BeginOAuthFlowResponse){
+    }
+
+    // Invoked to complete an OAuth flow. This must be implemented if the plugin 
+    // manifest has `canUseOAuth` set to true.
+    rpc CompleteOAuthFlow (CompleteOAuthFlowRequest) returns (CompleteOAuthFlowResponse){
+    }
+
+    // Configures a write back which can be used to write back a schema to the source.
+    // This must be implemented if the plugin manifest has `canConfigureWrite` set to true.
+    rpc ConfigureWrite (ConfigureWriteRequest) returns (ConfigureWriteResponse){
+    }
+
+    // Invoked to begin a write back request
+    // This must be implemented if the manifest has `canWrite` set to true.
+    rpc PrepareWrite (PrepareWriteRequest) returns (PrepareWriteResponse){
+    }
+
+    // Creates a stream of records to write back and opens a stream to receive acks for write backs
+    // This must be implemented if the manifest has `canWrite` set to true.
+    rpc WriteStream (stream Record) returns (stream RecordAck){
+    }
+}
+
+enum LogLevel {
+    Error = 0;
+    Warn = 1;
+    Info = 2;
+    Debug = 3;
+    Trace = 4;
+}
+
+message ConfigureRequest {
+    // The level of logging information the plugin should emit.
+    LogLevel log_level = 1;
+    // Directory where log files should be stored.
+    string log_directory = 2;
+    // Directory where the plugin can store data permanently.
+    string permanent_directory = 3;
+    // Directory where the plugin can store temporary information which may be deleted.
+    string temporary_directory = 4;
+}
+
+message ConfigureResponse{}
+
+message ConnectRequest {
+    // The settings the publisher should use to connect, as a JSON string.
+    // The JSON will be based on the JSONSchema defined in the publisher's package.json.
+    string settings_json = 2;
+
+    // OAuth configuration information which the plugin may need to
+    // obtain an access token using the OAuth state.
+    OAuthConfiguration oauth_configuration = 3;
+
+    // The OAuth state returned from the last Connect, ConnectSession, or CompleteOAuthFlow.
+    string oauth_state_json = 4;
+}
+
+// Connection result information.
+message ConnectResponse {
+
+    // If connection settings are invalid, this should contain the problem.
+    string settings_error = 1;
+
+    // If the connection settings appear valid, connecting to the target system failed,
+    // this should contain the error from the target system.
+    string connection_error = 2;
+
+    // If the OAuth state is invalid or expired, this should contain a description
+    // of the problem.
+    string oauth_error = 3;
+
+    // The OAuth data which should be stored securely and passed next time
+    // a connection is requested. This is returned by Connect because
+    // forming the connection may have used up a refresh token and 
+    // the new refresh token must now be stored.
+    string oauth_state_json = 4;
+}
+
+message ReadRequest {
+    // The schema of the records to publish.
+    Schema schema = 1;
+    // Limit of number of records to return.
+    uint32 limit = 2;
+    // Zero or more filters which should be applied to the returned records.
+    repeated PublishFilter filters = 3;
+
+    // Settings for real time publishing, if any.
+    string real_time_settings_json = 6;
+
+    // State object from the last published record from the
+    // connection used for this publish request.
+    string real_time_state_json = 7;
+
+    // ID for the job which contains the schema, the connection used
+    // to connect before starting this job, the real time settings and state,
+    // and so on. Can be used to persist local state between publishes.
+    string job_id = 8;
+
+    // The data_version is a counter that will be incremented whenever
+    // all data produced for a particular job_id should be discarded.    
+    uint32 data_version = 9;
+}
+
+message PublishFilter {
+    enum Kind {
+        // The property on the record must equal the filter value.
+        EQUALS = 0;
+        // The property on the record must be less than the filter value.
+        LESS_THAN = 1;
+        // The property on the record must be greater than the filter value.
+        GREATER_THAN = 2;
+    }
+    // Kind of the match.
+    Kind kind = 1;
+    // The id of the property on each record which should be matched against the value.
+    string property_id = 2;
+    // The value of the which should be matched against the named property for each record, as a string.
+    // The publisher is responsible for converting the value to the correct type.
+    string value = 3;
+
+}
+
+message DiscoverSchemasRequest {
+    enum Mode {
+        // ALL means all schemas the publisher can publish should be returned.
+        ALL = 0;
+        // REFRESH means the publisher return (updated) schemas identified by the partial schemas included in to_refresh.
+        REFRESH = 1;
+    }
+    // Mode is the discovery mode.
+    Mode mode = 1;
+    // The schemas to refresh if mode == 1.
+    repeated Schema to_refresh = 2;
+    // Size of the sample of records to include in the returned schemas.
+    uint32 sample_size = 4;
+}
+
+message DiscoverSchemasResponse {
+    // Schemas discovered by the publisher.
+    repeated Schema schemas = 1;
+}
+
+message Schema {
+    enum DataFlowDirection {
+        READ = 0;
+        WRITE = 1;
+        READ_WRITE = 2;
+    }
+    // ID that the plugin uses to uniquely identify this schema.
+    string id = 1;
+    // Name of this schema (must be a permanant identifier which is unique in this source).
+    string name = 2;
+    // Description of this schema, if available.
+    string description = 3;
+    // Properties of this schema.
+    repeated Property properties = 4;
+    // Count of records available in this schema.
+    Count count = 5;
+    // Sample containing zero or more records representative of the data in this schema.
+    repeated Record sample = 6;
+    // When returned from a publisher, the optional query which can be passed to the publisher to publish records from this schema.
+    // When passed to the publisher, the query which should be used to publish records from this schema.
+    string query = 7;
+    // Arbitrary JSON blob containing information the publisher uses for things like change detection.
+    string publisher_meta_json = 8;
+
+    // Errors that occurred while discovering this schema.
+    repeated string errors = 9;
+
+    DataFlowDirection data_flow_direction = 10;
+}
+
+message Count {
+    enum Kind {
+        UNAVAILABLE = 0;
+        ESTIMATE = 1;
+        EXACT = 2;
+    }
+    Kind kind = 1;
+    int32 value = 2;
+}
+
+message Property {
+    // ID is the permanent, unique identifier for this property.
+    string id = 1;
+    // Name is an optional display name for the property.
+    string name = 2;
+    // Description of this property, if available.
+    string description = 3;
+    // Type of the property. Use STRING if no other type matches.
+    PropertyType type = 4;
+    // Set to true if this property is part of the primary key for this schema.
+    bool is_key = 5;
+    // Set to true if this property is an orderable value which can be used
+    // to determine if one record was created more recently than another record.
+    // For example, a CreatedAt datetime column or an auto-incrementing integer primary key.
+    bool is_create_counter = 6;
+    // Set to true if this property is an orderable value which can be used
+    // to determine if one record was updated more recently than another record.
+    // For example, an UpdatedAt datetime column.
+    bool is_update_counter = 7;
+    // Arbitrary JSON blob containing information the publisher uses for things like change detection.
+    string publisher_meta_json = 8;
+
+    // The type of the property as defined in the source system. Used to provide
+    // human-readable hints when building mappings.
+    string type_at_source = 9;
+    // Indicates that this property is nullable.
+    bool is_nullable = 10;
+}
+
+enum PropertyType {
+    // Unicode string, less than 1024 characters.
+    STRING = 0;
+    // true/false.
+    BOOL = 2;
+    // 64-bit integer.
+    INTEGER = 3;
+    // 64-bit floating point number.
+    FLOAT = 4;
+    // Absolute precision number of any size.
+    DECIMAL = 5;
+    // Date (no time).
+    DATE = 6;
+    // Time (no date).
+    TIME = 7;
+    // Datetime (date and time).
+    DATETIME = 8;
+    // Unicode string, more than 1024 characters.
+    TEXT = 9;
+    // Binary data as a base-64 encoded string.
+    BLOB = 10;
+    // A JSON object as a string.
+    JSON = 11;
+    // An XML object as a string.
+    XML = 12;
+}
+
+message DisconnectRequest {
+
+}
+
+message DisconnectResponse {
+
+}
+
+message Record {
+    enum Action {
+        UPSERT = 0;
+        INSERT = 1;
+        UPDATE = 2;
+        DELETE = 3;
+        // This action indicates that there is no data in this record;
+        // instead the real time state field on this record should be persisted.
+        REAL_TIME_STATE_COMMIT = 4;
+    }
+    // Action for this record. Default value is UPSERT if the plugin 
+    // cannot determine what the action should be relative to data alreay acquired.
+    Action action = 1;
+    // Data for this record, as a JSON string.
+    string data_json = 2;
+
+    // State which should be preserved and passed back to the next
+    // call of PublishStream. Only considered if action indicates this is a state commit.
+    string real_time_state_json = 3;
+
+    // Cause for the publish of the record.
+    // If provided, this should be an end-user readable string describing what triggered the publish.
+    // This should only be set for real time published records, where the cause may be interesting.
+    string cause = 4;
+
+    // Correlation ID for a record
+    // Only expected to be used within the WriteStream method
+    string correlation_id = 5;
+}
+
+message ConfigureQueryRequest {
+    // The form state for the request.
+    ConfigurationFormRequest form = 1;
+}
+
+message ConfigureQueryResponse {
+    ConfigurationFormResponse form = 1;
+
+    // The schema that this query will produce.
+    Schema schema = 2;
+}
+
+message ConfigureConnectionRequest {
+    // The form state for the request.
+    ConfigurationFormRequest form = 1;
+
+    // An embedded ConnectRequest to support passing
+    // OAuth secrets into the connection configuration operation.
+    ConnectRequest connect_request = 2;
+}
+
+message ConfigureConnectionResponse {
+    ConfigurationFormResponse form = 1;
+
+    // An embedded ConnectResponse to support returning
+    // updated OAuth secrets from the connection configuration operation
+    // if the secrets have been updated.
+    ConnectResponse connect_response = 2;
+}
+
+
+message ConfigureRealTimeRequest {
+    // The form state for the request.
+    ConfigurationFormRequest form = 1;
+
+    // The schema (schema) which is being targeted for real time publishing.
+    Schema schema = 2;
+}
+
+message ConfigureRealTimeResponse {
+    ConfigurationFormResponse form = 1;
+}
+
+message ConfigurationFormRequest {
+    // JSON object containing the current values of the settings
+    // as entered into the UI.
+    string data_json = 1;
+
+    // Opaque state object from the most recent Configure*Response.
+    string state_json = 2;
+}
+
+message ConfigurationFormResponse {
+
+    // The JSONSchema which should be used to build the form.
+    string schema_json = 1;
+
+    // The UI hints which should be provided to the form.
+    string ui_json = 2;
+
+    // The state object which should be passed in any future Configure*Request as part of this configuration session.
+    string state_json = 3;
+
+    // Current values from the form.    
+    string data_json = 4;
+
+    // Errors which should be displayed attached to fields in the form,
+    // in the form of a JSON object with the same schema as the data object,
+    // but the values are arrays of strings containing the error messages.
+    string data_errors_json = 5;
+
+    // Generic errors which should be displayed at the bottom of the form,
+    // not associated with any specific fields.
+    repeated string errors = 6;
+}
+
+message BeginOAuthFlowRequest {
+    OAuthConfiguration configuration = 1;
+
+    // The URL that the auth server should send the authorization token to.
+    string redirect_url = 2;
+}
+
+message BeginOAuthFlowResponse {
+    // The URL the user should use to start the authorization process.
+    string authorization_url = 1;
+}
+
+message CompleteOAuthFlowRequest {
+    OAuthConfiguration configuration = 1;
+    // The URL that the OAuth flow redirected the user to after authentication.
+    // If the response_mode was 'query' this will contain the token.
+    string redirect_url = 2;
+    // The body that the OAuth flow caused to be posted if the response_mode
+    // for the redirect was 'form_post'.
+    string redirect_body = 3;
+}
+
+message OAuthConfiguration {
+    // Client ID to use for resolving codes.
+    string client_id = 1;
+    // Client secret to use for resolving codes.
+    string client_secret = 2;
+    // The configuration blob stored for this plugin type,
+    // which can contain any data that should not be hard coded into the plugin.
+    string configuration_json = 3;
+}
+
+message CompleteOAuthFlowResponse {
+    // JSON data containing the OAuth information the plugin wants
+    // to be passed to any connect request.
+    string oauth_state_json = 1;
+}
+
+message ConfigureWriteRequest {
+    // The form state for the request.
+    ConfigurationFormRequest form = 1;
+}
+
+message ConfigureWriteResponse {
+    // Configuration object to build the ui
+    ConfigurationFormResponse form = 1;
+
+    // The schema (schema) which is being targeted for write backs.
+    Schema schema = 2;
+}
+
+message PrepareWriteRequest {
+    // Time in seconds that a record write back must be acknowledged by the plugin in
+    int32 commit_sla_seconds = 1;
+
+    // Schema to write back to source system
+    Schema schema = 2;
+}
+
+message PrepareWriteResponse {
+
+}
+
+message RecordAck {
+    // Correlation ID for record that has been written back
+    string correlation_id = 1;
+
+    // Contains information about any error in writing back the record
+    string error = 2;
+}
