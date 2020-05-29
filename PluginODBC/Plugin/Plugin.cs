@@ -6,12 +6,13 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Grpc.Core;
+using Naveego.Sdk.Plugins;
 using Newtonsoft.Json;
 using PluginODBC.API;
 using PluginODBC.DataContracts;
 using PluginODBC.Helper;
 using PluginODBC.Interfaces;
-using Pub;
+
 
 namespace PluginODBC.Plugin
 {
@@ -50,7 +51,7 @@ namespace PluginODBC.Plugin
             }
             catch (Exception e)
             {
-                Logger.Error(e.Message);
+                Logger.Error(e, e.Message, context);
                 return Task.FromResult(new ConnectResponse
                 {
                     OauthStateJson = request.OauthStateJson,
@@ -71,7 +72,7 @@ namespace PluginODBC.Plugin
             }
             catch (Exception e)
             {
-                Logger.Error(e.Message);
+                Logger.Error(e, e.Message, context);
                 return Task.FromResult(new ConnectResponse
                 {
                     OauthStateJson = request.OauthStateJson,
@@ -129,6 +130,7 @@ namespace PluginODBC.Plugin
         public override async Task<DiscoverSchemasResponse> DiscoverSchemas(DiscoverSchemasRequest request,
             ServerCallContext context)
         {
+            Logger.SetLogPrefix("discovery_");
             Logger.Info("Discovering Schemas...");
 
             DiscoverSchemasResponse discoverSchemasResponse = new DiscoverSchemasResponse();
@@ -143,9 +145,9 @@ namespace PluginODBC.Plugin
             try
             {
                 var refreshSchemas = request.ToRefresh;
-            
+
                 Logger.Info($"Refresh schemas attempted: {refreshSchemas.Count}");
-            
+
                 var tasks = refreshSchemas.Select(GetSchemaProperties)
                     .ToArray();
 
@@ -159,8 +161,8 @@ namespace PluginODBC.Plugin
             }
             catch (Exception e)
             {
-                Logger.Error(e.Message);
-                throw;
+                Logger.Error(e, e.Message, context);
+                return new DiscoverSchemasResponse();
             }
         }
 
@@ -174,6 +176,7 @@ namespace PluginODBC.Plugin
         public override async Task ReadStream(ReadRequest request, IServerStreamWriter<Record> responseStream,
             ServerCallContext context)
         {
+            Logger.SetLogPrefix($"{request.JobId}_");
             var schema = request.Schema;
             var limit = request.Limit;
             var limitFlag = request.Limit != 0;
@@ -187,15 +190,15 @@ namespace PluginODBC.Plugin
                 if (!string.IsNullOrWhiteSpace(_server.Settings.PrePublishQuery))
                 {
                     // create new db connection and command
-                    var connection = _connService.MakeConnectionObject();       
+                    var connection = _connService.MakeConnectionObject();
                     var command = _connService.MakeCommandObject(_server.Settings.PrePublishQuery, connection);
-                
+
                     // open the connection
                     connection.Open();
-                
+
                     // execute query
                     var reader = command.ExecuteReader();
-                    
+
                     // close reader and connection
                     reader.Close();
                     connection.Close();
@@ -203,14 +206,14 @@ namespace PluginODBC.Plugin
             }
             catch (Exception e)
             {
-                Logger.Error(e.Message);
-                throw;
+                Logger.Error(e, e.Message, context);
+                return;
             }
 
             try
             {
                 var recordsCount = 0;
-                
+
                 // Check if query is empty
                 if (string.IsNullOrWhiteSpace(schema.Query))
                 {
@@ -219,12 +222,12 @@ namespace PluginODBC.Plugin
                 }
 
                 // create new db connection and command
-                var connection = _connService.MakeConnectionObject();       
+                var connection = _connService.MakeConnectionObject();
                 var command = _connService.MakeCommandObject(schema.Query, connection);
-                
+
                 // open the connection
                 connection.Open();
-                
+
                 // get a reader object for the query
                 var reader = command.ExecuteReader();
 
@@ -239,23 +242,31 @@ namespace PluginODBC.Plugin
                         {
                             try
                             {
-                                recordMap[property.Id] = reader[property.Id];
+                                switch (property.Type)
+                                {
+                                    case PropertyType.String:
+                                        recordMap[property.Id] = reader[property.Id].ToString();
+                                        break;
+                                    default:
+                                        recordMap[property.Id] = reader[property.Id];
+                                        break;
+                                }
                             }
                             catch (Exception e)
                             {
-                                Logger.Error($"No column with property Id: {property.Id}");
-                                Logger.Error(e.Message);
+                                Logger.Error(e, $"No column with property Id: {property.Id}");
+                                Logger.Error(e, e.Message);
                                 recordMap[property.Id] = "";
                             }
                         }
-                    
+
                         // create record
                         var record = new Record
                         {
                             Action = Record.Types.Action.Upsert,
                             DataJson = JsonConvert.SerializeObject(recordMap)
                         };
-                    
+
                         // stop publishing if the limit flag is enabled and the limit has been reached or the server is disconnected
                         if ((limitFlag && recordsCount == limit) || !_server.Connected)
                         {
@@ -267,19 +278,19 @@ namespace PluginODBC.Plugin
                         recordsCount++;
                     }
                 }
-                
+
                 // close reader and connection
                 reader.Close();
                 connection.Close();
-                
+
                 Logger.Info($"Published {recordsCount} records");
             }
             catch (Exception e)
             {
-                Logger.Error(e.Message);
-                throw;
+                Logger.Error(e, e.Message, context);
+                return;
             }
-            
+
             // post publish query
             try
             {
@@ -287,15 +298,15 @@ namespace PluginODBC.Plugin
                 if (!string.IsNullOrWhiteSpace(_server.Settings.PostPublishQuery))
                 {
                     // create new db connection and command
-                    var connection = _connService.MakeConnectionObject();       
+                    var connection = _connService.MakeConnectionObject();
                     var command = _connService.MakeCommandObject(_server.Settings.PostPublishQuery, connection);
-                
+
                     // open the connection
                     connection.Open();
-                
+
                     // execute query
                     var reader = command.ExecuteReader();
-                    
+
                     // close reader and connection
                     reader.Close();
                     connection.Close();
@@ -303,89 +314,115 @@ namespace PluginODBC.Plugin
             }
             catch (Exception e)
             {
-                Logger.Error(e.Message);
-                throw;
+                Logger.Error(e, e.Message, context);
             }
         }
-        
+
         /// <summary>
         /// Creates a form and handles form updates for write backs
         /// </summary>
         /// <param name="request"></param>
         /// <param name="context"></param>
         /// <returns></returns>
-        public override Task<ConfigureWriteResponse> ConfigureWrite(ConfigureWriteRequest request, ServerCallContext context)
+        public override Task<ConfigureWriteResponse> ConfigureWrite(ConfigureWriteRequest request,
+            ServerCallContext context)
         {
             Logger.Info("Configuring write...");
-            
+
             var schemaJsonObj = new Dictionary<string, object>
             {
                 {"type", "object"},
-                {"properties", new Dictionary<string, object>
                 {
-                    {"Query", new Dictionary<string, string>
+                    "properties", new Dictionary<string, object>
                     {
-                        {"type", "string"},
-                        {"title", "Query"},
-                        {"description", "Query to execute for write back with parameter place holders"},
-                    }},
-                    {"Parameters", new Dictionary<string, object>
-                    {
-                        {"type", "array"},
-                        {"title", "Parameters"},
-                        {"description", "Parameters to replace the place holders in the query"},
-                        {"items", new Dictionary<string, object>
                         {
-                            {"type", "object"},
-                            {"properties", new Dictionary<string, object>
+                            "Query", new Dictionary<string, string>
                             {
-                                {"ParamName", new Dictionary<string, object>
-                                {
-                                    {"type", "string"},
-                                    {"title", "Name"}
-                                }},
-                                {"ParamType", new Dictionary<string, object>
-                                {
-                                    {"type", "string"},
-                                    {"title", "Type"},
-                                    {"enum", new []
-                                    {
-                                        "string", "bool", "int", "float", "decimal"
-                                    }},
-                                    {"enumNames", new []
-                                    {
-                                        "String", "Bool", "Int", "Float", "Decimal"
-                                    }},
-                                }},
-                            }},
-                            {"required", new []
+                                {"type", "string"},
+                                {"title", "Query"},
+                                {"description", "Query to execute for write back with parameter place holders"},
+                            }
+                        },
+                        {
+                            "Parameters", new Dictionary<string, object>
                             {
-                                "ParamName", "ParamType"
-                            }}
-                        }}
-                    }},
-                }},
-                {"required", new []
+                                {"type", "array"},
+                                {"title", "Parameters"},
+                                {"description", "Parameters to replace the place holders in the query"},
+                                {
+                                    "items", new Dictionary<string, object>
+                                    {
+                                        {"type", "object"},
+                                        {
+                                            "properties", new Dictionary<string, object>
+                                            {
+                                                {
+                                                    "ParamName", new Dictionary<string, object>
+                                                    {
+                                                        {"type", "string"},
+                                                        {"title", "Name"}
+                                                    }
+                                                },
+                                                {
+                                                    "ParamType", new Dictionary<string, object>
+                                                    {
+                                                        {"type", "string"},
+                                                        {"title", "Type"},
+                                                        {
+                                                            "enum", new[]
+                                                            {
+                                                                "string", "bool", "int", "float", "decimal"
+                                                            }
+                                                        },
+                                                        {
+                                                            "enumNames", new[]
+                                                            {
+                                                                "String", "Bool", "Int", "Float", "Decimal"
+                                                            }
+                                                        },
+                                                    }
+                                                },
+                                            }
+                                        },
+                                        {
+                                            "required", new[]
+                                            {
+                                                "ParamName", "ParamType"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                    }
+                },
                 {
-                    "Query"
-                }}
+                    "required", new[]
+                    {
+                        "Query"
+                    }
+                }
             };
-            
+
             var uiJsonObj = new Dictionary<string, object>
             {
-                {"ui:order", new []
                 {
-                    "Query", "Parameters"
-                }},
-                {"Query", new Dictionary<string, object>
+                    "ui:order", new[]
+                    {
+                        "Query", "Parameters"
+                    }
+                },
                 {
-                    {"ui:widget", "textarea"}
-                }}
+                    "Query", new Dictionary<string, object>
+                    {
+                        {"ui:widget", "textarea"}
+                    }
+                }
             };
 
             var schemaJson = JsonConvert.SerializeObject(schemaJsonObj);
             var uiJson = JsonConvert.SerializeObject(uiJsonObj);
-            
+
             // if first call 
             if (request.Form == null || request.Form.DataJson == "")
             {
@@ -408,7 +445,7 @@ namespace PluginODBC.Plugin
             {
                 // get form data
                 var formData = JsonConvert.DeserializeObject<ConfigureWriteFormData>(request.Form.DataJson);
-            
+
                 // base schema to return
                 var schema = new Schema
                 {
@@ -417,7 +454,7 @@ namespace PluginODBC.Plugin
                     Query = formData.Query,
                     DataFlowDirection = Schema.Types.DataFlowDirection.Write
                 };
-            
+
                 // add parameters to properties
                 foreach (var param in formData.Parameters)
                 {
@@ -428,7 +465,7 @@ namespace PluginODBC.Plugin
                         Type = GetWriteBackType(param.ParamType)
                     });
                 }
-            
+
                 return Task.FromResult(new ConfigureWriteResponse
                 {
                     Form = new ConfigurationFormResponse
@@ -444,13 +481,13 @@ namespace PluginODBC.Plugin
             }
             catch (Exception e)
             {
-                Logger.Error(e.Message);
+                Logger.Error(e, e.Message, context);
                 return Task.FromResult(new ConfigureWriteResponse
                 {
                     Form = new ConfigurationFormResponse
                     {
                         DataJson = request.Form.DataJson,
-                        Errors = { e.Message },
+                        Errors = {e.Message},
                         SchemaJson = schemaJson,
                         UiJson = uiJson,
                         StateJson = request.Form.StateJson
@@ -508,7 +545,7 @@ namespace PluginODBC.Plugin
                 {
                     var record = requestStream.Current;
                     inCount++;
-                    
+
                     Logger.Debug($"Got Record {record.DataJson}");
 
                     // send record to source system
@@ -545,8 +582,7 @@ namespace PluginODBC.Plugin
             }
             catch (Exception e)
             {
-                Logger.Error(e.Message);
-                throw;
+                Logger.Error(e, e.Message, context);
             }
         }
 
@@ -583,6 +619,8 @@ namespace PluginODBC.Plugin
         {
             try
             {
+                Logger.Info($"Getting schema for query:\n{schema.Query}");
+
                 // Check if query is empty
                 if (string.IsNullOrWhiteSpace(schema.Query))
                 {
@@ -590,23 +628,28 @@ namespace PluginODBC.Plugin
                 }
 
                 // create new db connection and command
-                var connection = _connService.MakeConnectionObject();       
+                var connection = _connService.MakeConnectionObject();
                 var command = _connService.MakeCommandObject(schema.Query, connection);
-                
+
                 // open the connection
                 connection.Open();
-                
+
+                Logger.Info($"Opened connection for query:\n{schema.Query}");
+
                 // get a reader object for the query
                 var reader = command.ExecuteReader();
 
+                Logger.Info($"Got reader for query:\n{schema.Query}");
+
                 // get metadata table object for reader
                 var schemaTable = reader.GetSchemaTable();
-                
+
                 if (schemaTable != null)
                 {
+                    Logger.Info($"Got schema table for query:\n{schema.Query}");
                     // counter for unknown columns with no name
                     var unnamedColIndex = 0;
-                    
+
                     // get each column and create a property for the column
                     foreach (DataRow row in schemaTable.Rows)
                     {
@@ -617,7 +660,7 @@ namespace PluginODBC.Plugin
                             colName = $"UNKNOWN_{unnamedColIndex}";
                             unnamedColIndex++;
                         }
-                    
+
                         // create property
                         var property = new Property
                         {
@@ -632,25 +675,29 @@ namespace PluginODBC.Plugin
                             IsUpdateCounter = false,
                             PublisherMetaJson = ""
                         };
-                    
+
                         // add property to schema
                         schema.Properties.Add(property);
                     }
                 }
                 else
                 {
+                    Logger.Info($"Failed to get schema table for query:\n{schema.Query}");
+                    Logger.Info($"Returning null schema for query:\n{schema.Query}");
                     schema = null;
                 }
-                
+
                 // close reader and connection
                 reader.Close();
                 connection.Close();
 
-                return Task.FromResult(schema);             
+                return Task.FromResult(schema);
             }
             catch (Exception e)
             {
-                Logger.Error(e.Message);
+                Logger.Info($"Error processing query:\n{schema?.Query}");
+                Logger.Error(e, e.Message);
+                Logger.Info($"Returning null schema for query:\n{schema?.Query}");
                 return null;
             }
         }
@@ -680,6 +727,7 @@ namespace PluginODBC.Plugin
                     {
                         return PropertyType.Text;
                     }
+
                     return PropertyType.String;
                 default:
                     return PropertyType.String;
@@ -725,13 +773,13 @@ namespace PluginODBC.Plugin
                 {
                     return Task.FromResult("Query not defined.");
                 }
-                
+
                 var recObj = JsonConvert.DeserializeObject<Dictionary<string, object>>(record.DataJson);
 
                 // create new db connection and command
-                var connection = _connService.MakeConnectionObject();       
+                var connection = _connService.MakeConnectionObject();
                 var command = _connService.MakeCommandObject(schema.Query, connection);
-                
+
                 // add parameters
                 foreach (var property in schema.Properties)
                 {
@@ -758,29 +806,29 @@ namespace PluginODBC.Plugin
                             type = OdbcType.VarChar;
                             break;
                     }
-                    
+
                     var param = command.AddParameter(property.Id, type);
                     param.Value = recObj[property.Id];
                 }
-                
+
                 // open the connection
                 connection.Open();
-                
+
                 // get a reader object for the query
                 command.Prepare();
                 var reader = command.ExecuteReader();
-                
-                Logger.Info($"Modified {reader.RecordsAffected} records.");
-                
+
+                Logger.Info($"Modified {reader.RecordsAffected} record(s).");
+
                 // close reader and connection
                 reader.Close();
                 connection.Close();
-                
+
                 return Task.FromResult("");
             }
             catch (Exception e)
             {
-                Logger.Error(e.Message);
+                Logger.Error(e, e.Message);
                 return Task.FromResult(e.Message);
             }
         }

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
 using Grpc.Core;
-using Pub;
+using Naveego.Sdk.Plugins;
 using PluginODBC.Helper;
 
 namespace PluginODBC
@@ -15,7 +15,7 @@ namespace PluginODBC
                 // Add final chance exception handler
                 AppDomain.CurrentDomain.UnhandledException += (sender, eventArgs) =>
                 {
-                    Logger.Error($"died: {eventArgs.ExceptionObject}");
+                    Logger.Error(null, $"died: {eventArgs.ExceptionObject}");
                 };
                 
                 // clean old logs on start up
@@ -47,7 +47,7 @@ namespace PluginODBC
             }
             catch (Exception e)
             {
-                Logger.Error(e.Message);
+                Logger.Error(e, e.Message);
             }
         }
     }

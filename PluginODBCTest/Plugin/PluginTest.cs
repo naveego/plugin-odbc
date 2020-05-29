@@ -8,12 +8,12 @@ using System.Threading.Tasks;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using Moq;
+using Naveego.Sdk.Plugins;
 using PluginODBC.Helper;
 using PluginODBC.Interfaces;
-using Pub;
+
 using Xunit;
-using Record = Pub.Record;
-using Type = System.Type;
+using Record = Naveego.Sdk.Plugins.Record;
 
 namespace PluginODBCTest.Plugin
 {

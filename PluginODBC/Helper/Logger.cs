@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Threading;
+using Grpc.Core;
 
 namespace PluginODBC.Helper
 {
@@ -14,7 +15,8 @@ namespace PluginODBC.Helper
             Error,
             Off
         }
-        
+
+        private static string _logPrefix = "";
         private static string _path = @"plugin-odbc-log.txt";
         private static LogLevel _level = LogLevel.Info;
         private static ReaderWriterLockSlim _readWriteLock = new ReaderWriterLockSlim();
@@ -29,8 +31,12 @@ namespace PluginODBC.Helper
             _readWriteLock.EnterWriteLock();
             try
             {
+                // ensure log directory exists
+                Directory.CreateDirectory("logs");
+                
                 // Append text to the file
-                using (StreamWriter sw = File.AppendText(_path))
+                var filePath = $"logs/{_logPrefix}{_path}";
+                using (StreamWriter sw = File.AppendText(filePath))
                 {
                     sw.WriteLine($"{DateTime.Now} {message}");
                     sw.Close();
@@ -101,13 +107,35 @@ namespace PluginODBC.Helper
         /// <summary>
         /// Logging method for Error messages
         /// </summary>
+        /// <param name="exception"></param>
         /// <param name="message"></param>
-        public static void Error(string message)
+        public static void Error(Exception exception, string message)
         {
             if (_level > LogLevel.Error)
             {
                 return;
             }
+            
+            GrpcEnvironment.Logger.Error(exception, message);
+            
+            Log(message);
+        }
+        
+        /// <summary>
+        /// Logging method for Error messages to the context
+        /// </summary>
+        /// <param name="message"></param>
+        /// <param name="exception"></param>
+        /// <param name="context"></param>
+        public static void Error(Exception exception, string message, ServerCallContext context)
+        {
+            if (_level > LogLevel.Error)
+            {
+                return;
+            }
+            
+            GrpcEnvironment.Logger.Error(exception, message);
+            context.Status = new Status(StatusCode.Unknown, message);
             
             Log(message);
         }
@@ -119,6 +147,15 @@ namespace PluginODBC.Helper
         public static void SetLogLevel(LogLevel level)
         {
             _level = level;
+        }
+
+        /// <summary>
+        /// Sets a 
+        /// </summary>
+        /// <param name="logPrefix"></param>
+        public static void SetLogPrefix(string logPrefix)
+        {
+            _logPrefix = logPrefix;
         }
     }
 }

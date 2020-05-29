@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using PluginODBC.Helper;
 using Xunit;
@@ -6,7 +7,7 @@ namespace PluginODBCTest.Helper
 {
     public class LoggerTest
     {
-        private static string _path = @"plugin-odbc-log.txt";
+        private static string _path = @"logs/plugin-odbc-log.txt";
         
         [Fact]
         public void VerboseTest()
@@ -19,7 +20,7 @@ namespace PluginODBCTest.Helper
             Logger.Verbose("verbose");
             Logger.Debug("debug");
             Logger.Info("info");
-            Logger.Error("error");
+            Logger.Error(new Exception("error"), "error");
 
             // assert
             string[] lines = File.ReadAllLines(_path);
@@ -41,7 +42,7 @@ namespace PluginODBCTest.Helper
             Logger.Verbose("verbose");
             Logger.Debug("debug");
             Logger.Info("info");
-            Logger.Error("error");
+            Logger.Error(new Exception("error"), "error");
 
             // assert
             string[] lines = File.ReadAllLines(_path);
@@ -63,7 +64,7 @@ namespace PluginODBCTest.Helper
             Logger.Verbose("verbose");
             Logger.Debug("debug");
             Logger.Info("info");
-            Logger.Error("error");
+            Logger.Error(new Exception("error"), "error");
 
             // assert
             string[] lines = File.ReadAllLines(_path);
@@ -85,7 +86,7 @@ namespace PluginODBCTest.Helper
             Logger.Verbose("verbose");
             Logger.Debug("debug");
             Logger.Info("info");
-            Logger.Error("error");
+            Logger.Error(new Exception("error"), "error");
 
             // assert
             string[] lines = File.ReadAllLines(_path);
@@ -107,7 +108,7 @@ namespace PluginODBCTest.Helper
             Logger.Verbose("verbose");
             Logger.Debug("debug");
             Logger.Info("info");
-            Logger.Error("error");
+            Logger.Error(new Exception("error"), "error");
 
             // assert
             string[] lines = File.Exists(_path) ? File.ReadAllLines(_path) : new string[0];
