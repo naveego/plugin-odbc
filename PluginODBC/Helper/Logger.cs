@@ -2,51 +2,52 @@ using System;
 using System.IO;
 using System.Threading;
 using Grpc.Core;
+using Naveego.Sdk.Plugins;
+using Serilog;
 
 namespace PluginODBC.Helper
 {
     public static class Logger
     {
-        public enum LogLevel
+        private static string _logPrefix = "";
+        private static string _fileName = @"plugin-filereader-log.txt";
+        private static LogLevel _level = LogLevel.Info;
+
+        /// <summary>
+        /// Initializes the logger
+        /// </summary>
+        public static void Init(string logPath = "logs")
         {
-            Verbose,
-            Debug,
-            Info,
-            Error,
-            Off
+            // remove any existing loggers
+            CloseAndFlush();
+            
+            // ensure log directory exists
+            Directory.CreateDirectory(logPath);
+            
+            // setup serilog
+            Log.Logger = new LoggerConfiguration()
+                .MinimumLevel.Verbose()
+                .Enrich.FromLogContext()
+                .WriteTo.Async(
+                    sinkConfig =>
+                    {
+                        sinkConfig.File(
+                            $"{logPath}/{_fileName}",
+                            rollingInterval: RollingInterval.Day,
+                            shared: true,
+                            rollOnFileSizeLimit: true
+                        );
+                        sinkConfig.Console();
+                    })
+                .CreateLogger();
         }
 
-        private static string _logPrefix = "";
-        private static string _path = @"plugin-odbc-log.txt";
-        private static LogLevel _level = LogLevel.Info;
-        private static ReaderWriterLockSlim _readWriteLock = new ReaderWriterLockSlim();
-        
         /// <summary>
-        /// Writes a log message with time stamp to a file
+        /// Closes the logger and flushes any pending messages in the buffer
         /// </summary>
-        /// <param name="message"></param>
-        private static void Log(string message)
+        public static void CloseAndFlush()
         {
-            // Set Status to Locked
-            _readWriteLock.EnterWriteLock();
-            try
-            {
-                // ensure log directory exists
-                Directory.CreateDirectory("logs");
-                
-                // Append text to the file
-                var filePath = $"logs/{_logPrefix}{_path}";
-                using (StreamWriter sw = File.AppendText(filePath))
-                {
-                    sw.WriteLine($"{DateTime.Now} {message}");
-                    sw.Close();
-                }
-            }
-            finally
-            {
-                // Release lock
-                _readWriteLock.ExitWriteLock();
-            }
+            Log.CloseAndFlush();
         }
         
         /// <summary>
@@ -54,11 +55,11 @@ namespace PluginODBC.Helper
         /// </summary>
         public static void Clean()
         {
-            if (File.Exists(_path))
+            if (File.Exists(_fileName))
             {
-                if ((File.GetCreationTime(_path) - DateTime.Now).TotalDays > 7)
+                if ((File.GetCreationTime(_fileName) - DateTime.Now).TotalDays > 7)
                 {
-                    File.Delete(_path);
+                    File.Delete(_fileName);
                 }
             }
         }
@@ -69,12 +70,14 @@ namespace PluginODBC.Helper
         /// <param name="message"></param>
         public static void Verbose(string message)
         {
-            if (_level > LogLevel.Verbose)
+            if (_level < LogLevel.Trace)
             {
                 return;
             }
             
-            Log(message);
+            GrpcEnvironment.Logger.Debug(message);
+            
+            Log.Verbose($"{_logPrefix} {message}");
         }
         
         /// <summary>
@@ -83,12 +86,14 @@ namespace PluginODBC.Helper
         /// <param name="message"></param>
         public static void Debug(string message)
         {
-            if (_level > LogLevel.Debug)
+            if (_level < LogLevel.Debug)
             {
                 return;
             }
             
-            Log(message);
+            GrpcEnvironment.Logger.Debug(message);
+            
+            Log.Debug($"{_logPrefix} {message}");
         }
         /// <summary>
         /// Logging method for Info messages
@@ -96,12 +101,14 @@ namespace PluginODBC.Helper
         /// <param name="message"></param>
         public static void Info(string message)
         {
-            if (_level > LogLevel.Info)
+            if (_level < LogLevel.Info)
             {
                 return;
             }
             
-            Log(message);
+            GrpcEnvironment.Logger.Info(message);
+            
+            Log.Information($"{_logPrefix} {message}");
         }
         
         /// <summary>
@@ -111,14 +118,14 @@ namespace PluginODBC.Helper
         /// <param name="message"></param>
         public static void Error(Exception exception, string message)
         {
-            if (_level > LogLevel.Error)
+            if (_level < LogLevel.Error)
             {
                 return;
             }
             
             GrpcEnvironment.Logger.Error(exception, message);
             
-            Log(message);
+            Log.Error(exception, $"{_logPrefix} {message}");
         }
         
         /// <summary>
@@ -129,7 +136,7 @@ namespace PluginODBC.Helper
         /// <param name="context"></param>
         public static void Error(Exception exception, string message, ServerCallContext context)
         {
-            if (_level > LogLevel.Error)
+            if (_level < LogLevel.Error)
             {
                 return;
             }
@@ -137,7 +144,7 @@ namespace PluginODBC.Helper
             GrpcEnvironment.Logger.Error(exception, message);
             context.Status = new Status(StatusCode.Unknown, message);
             
-            Log(message);
+            Log.Error(exception, $"{_logPrefix} {message}");
         }
 
         /// <summary>
@@ -155,7 +162,7 @@ namespace PluginODBC.Helper
         /// <param name="logPrefix"></param>
         public static void SetLogPrefix(string logPrefix)
         {
-            _logPrefix = logPrefix;
+            _logPrefix = $"<{logPrefix}>";
         }
     }
 }
