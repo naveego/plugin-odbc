@@ -450,7 +450,7 @@ namespace PluginODBC.Plugin
             var uiJson = JsonConvert.SerializeObject(uiJsonObj);
 
             // if first call 
-            if (request.Form == null || request.Form.DataJson == "")
+            if (string.IsNullOrWhiteSpace(request.Form.DataJson) || request.Form.DataJson == "{}")
             {
                 return Task.FromResult(new ConfigureWriteResponse
                 {
