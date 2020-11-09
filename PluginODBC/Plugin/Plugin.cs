@@ -174,7 +174,7 @@ namespace PluginODBC.Plugin
 
                 Logger.Info($"Refresh schemas attempted: {refreshSchemas.Count}");
 
-                var tasks = refreshSchemas.Select(GetSchemaProperties)
+                var tasks = refreshSchemas.Select(s => GetSchemaProperties(s, context))
                     .ToArray();
 
                 await Task.WhenAll(tasks);
@@ -641,7 +641,7 @@ namespace PluginODBC.Plugin
         /// </summary>
         /// <param name="schema"></param>
         /// <returns>A schema or null</returns>
-        private Task<Schema> GetSchemaProperties(Schema schema)
+        private Task<Schema> GetSchemaProperties(Schema schema, ServerCallContext context)
         {
             try
             {
@@ -650,6 +650,8 @@ namespace PluginODBC.Plugin
                 // Check if query is empty
                 if (string.IsNullOrWhiteSpace(schema.Query))
                 {
+                    var exception = new Exception("query is null");
+                    Logger.Error(exception, exception.Message, context);
                     return null;
                 }
 
@@ -708,7 +710,8 @@ namespace PluginODBC.Plugin
                 }
                 else
                 {
-                    Logger.Info($"Failed to get schema table for query:\n{schema.Query}");
+                    var exception = new Exception($"Failed to get schema table for query:\n{schema.Query}");
+                    Logger.Error(exception, exception.Message, context);
                     Logger.Info($"Returning null schema for query:\n{schema.Query}");
                     schema = null;
                 }
@@ -722,7 +725,7 @@ namespace PluginODBC.Plugin
             catch (Exception e)
             {
                 Logger.Info($"Error processing query:\n{schema?.Query}");
-                Logger.Error(e, e.Message);
+                Logger.Error(e, e.Message, context);
                 Logger.Info($"Returning null schema for query:\n{schema?.Query}");
                 return null;
             }

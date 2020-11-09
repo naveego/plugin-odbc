@@ -10,7 +10,7 @@ namespace PluginODBC.Helper
     public static class Logger
     {
         private static string _logPrefix = "";
-        private static string _fileName = @"plugin-filereader-log.txt";
+        private static string _fileName = @"plugin-odbc-log.txt";
         private static LogLevel _level = LogLevel.Info;
 
         /// <summary>
