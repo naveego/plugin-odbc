@@ -726,8 +726,7 @@ namespace PluginODBC.Plugin
             {
                 Logger.Info($"Error processing query:\n{schema?.Query}");
                 Logger.Error(e, e.Message, context);
-                Logger.Info($"Returning null schema for query:\n{schema?.Query}");
-                return null;
+                throw;
             }
         }
 
