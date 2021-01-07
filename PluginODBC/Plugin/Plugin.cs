@@ -29,7 +29,7 @@ namespace PluginODBC.Plugin
             _connFactory = connFactory ?? (s => new ConnectionFactoryService(s));
             _server = new ServerStatus();
         }
-        
+
         /// <summary>
         /// Configures the plugin
         /// </summary>
@@ -40,12 +40,12 @@ namespace PluginODBC.Plugin
         {
             Logger.Debug("Got configure request");
             Logger.Debug(JsonConvert.SerializeObject(request, Formatting.Indented));
-            
+
             // ensure all directories are created
             Directory.CreateDirectory(request.TemporaryDirectory);
             Directory.CreateDirectory(request.PermanentDirectory);
             Directory.CreateDirectory(request.LogDirectory);
-            
+
             // configure logger
             Logger.SetLogLevel(request.LogLevel);
             Logger.Init(request.LogDirectory);
@@ -174,7 +174,7 @@ namespace PluginODBC.Plugin
 
                 Logger.Info($"Refresh schemas attempted: {refreshSchemas.Count}");
 
-                var tasks = refreshSchemas.Select(s => GetSchemaProperties(s, context))
+                var tasks = refreshSchemas.Select(s => GetSchemaProperties(s, request.SampleSize, context))
                     .ToArray();
 
                 await Task.WhenAll(tasks);
@@ -257,52 +257,17 @@ namespace PluginODBC.Plugin
                 // get a reader object for the query
                 var reader = command.ExecuteReader();
 
-                if (reader.HasRows)
+                foreach (var record in ReadRecords(reader, schema))
                 {
-                    while (reader.Read() && _server.Connected)
+                    // stop publishing if the limit flag is enabled and the limit has been reached or the server is disconnected
+                    if ((limitFlag && recordsCount == limit) || !_server.Connected)
                     {
-                        // build record map
-                        var recordMap = new Dictionary<string, object>();
-
-                        foreach (var property in schema.Properties)
-                        {
-                            try
-                            {
-                                switch (property.Type)
-                                {
-                                    case PropertyType.String:
-                                        recordMap[property.Id] = reader[property.Id].ToString();
-                                        break;
-                                    default:
-                                        recordMap[property.Id] = reader[property.Id];
-                                        break;
-                                }
-                            }
-                            catch (Exception e)
-                            {
-                                Logger.Error(e, $"No column with property Id: {property.Id}");
-                                Logger.Error(e, e.Message);
-                                recordMap[property.Id] = "";
-                            }
-                        }
-
-                        // create record
-                        var record = new Record
-                        {
-                            Action = Record.Types.Action.Upsert,
-                            DataJson = JsonConvert.SerializeObject(recordMap)
-                        };
-
-                        // stop publishing if the limit flag is enabled and the limit has been reached or the server is disconnected
-                        if ((limitFlag && recordsCount == limit) || !_server.Connected)
-                        {
-                            break;
-                        }
-
-                        // publish record
-                        await responseStream.WriteAsync(record);
-                        recordsCount++;
+                        break;
                     }
+
+                    // publish record
+                    await responseStream.WriteAsync(record);
+                    recordsCount++;
                 }
 
                 // close reader and connection
@@ -640,8 +605,10 @@ namespace PluginODBC.Plugin
         /// Gets a schema for a given query
         /// </summary>
         /// <param name="schema"></param>
+        /// <param name="sampleSize"></param>
+        /// /// <param name="context"></param>
         /// <returns>A schema or null</returns>
-        private Task<Schema> GetSchemaProperties(Schema schema, ServerCallContext context)
+        private Task<Schema> GetSchemaProperties(Schema schema, uint sampleSize, ServerCallContext context)
         {
             try
             {
@@ -707,6 +674,9 @@ namespace PluginODBC.Plugin
                         // add property to schema
                         schema.Properties.Add(property);
                     }
+                    
+                    var recordSample = ReadRecords(reader, schema).Take(Convert.ToInt32(sampleSize));
+                    schema.Sample.AddRange(recordSample);
                 }
                 else
                 {
@@ -783,6 +753,51 @@ namespace PluginODBC.Plugin
                     return PropertyType.Decimal;
                 default:
                     return PropertyType.String;
+            }
+        }
+
+        private IEnumerable<Record> ReadRecords(IReaderService reader, Schema schema)
+        {
+            if (!reader.HasRows)
+            {
+                yield break;
+            }
+            
+            while (reader.Read() && _server.Connected)
+            {
+                // build record map
+                var recordMap = new Dictionary<string, object>();
+
+                foreach (var property in schema.Properties)
+                {
+                    try
+                    {
+                        switch (property.Type)
+                        {
+                            case PropertyType.String:
+                                recordMap[property.Id] = reader[property.Id].ToString();
+                                break;
+                            default:
+                                recordMap[property.Id] = reader[property.Id];
+                                break;
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.Error(e, $"No column with property Id: {property.Id}");
+                        Logger.Error(e, e.Message);
+                        recordMap[property.Id] = "";
+                    }
+                }
+
+                // create record
+                var record = new Record
+                {
+                    Action = Record.Types.Action.Upsert,
+                    DataJson = JsonConvert.SerializeObject(recordMap)
+                };
+
+                yield return record;
             }
         }
 
