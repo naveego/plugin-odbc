@@ -1,6 +1,6 @@
 using System;
-using Xunit;
 using PluginODBC.Helper;
+using Xunit;
 
 namespace PluginODBCTest.Helper
 {

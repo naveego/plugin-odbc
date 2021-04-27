@@ -29,7 +29,7 @@
   },
   "configSchema": {
     "ui": {
-      "ui:order": ["ConnectionString", "Password", "PrePublishQuery", "PostPublishQuery"],
+      "ui:order": ["ConnectionString", "Password"],
       "Password": {
         "ui:widget": "password"
       },
@@ -52,16 +52,6 @@
           "type": "string",
           "title": "Password",
           "description": "(Optional) The secret of your connection string. Will replace PASSWORD in the connection string."
-        },
-        "PrePublishQuery": {
-          "type": "string",
-          "title": "Pre-Publish Query",
-          "description": "(Optional) Query to be run before a read begins."
-        },
-        "PostPublishQuery": {
-          "type": "string",
-          "title": "Post-Publish Query",
-          "description": "(Optional) Query to be run after a read completes."
         }
       },
       "required": ["ConnectionString"]

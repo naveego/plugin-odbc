@@ -6,8 +6,6 @@ namespace PluginODBC.Helper
     {
         public string ConnectionString { get; set; }
         public string Password { get; set; }
-        public string PrePublishQuery { get; set; }
-        public string PostPublishQuery { get; set; }
 
         /// <summary>
         /// Validates the settings input object

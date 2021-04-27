@@ -1,4 +1,3 @@
-using System.Data.Odbc;
 using Naveego.Sdk.Plugins;
 
 namespace PluginODBC.Helper

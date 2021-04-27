@@ -9,9 +9,8 @@ using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using Moq;
 using Naveego.Sdk.Plugins;
+using PluginODBC.API.Factory;
 using PluginODBC.Helper;
-using PluginODBC.Interfaces;
-
 using Xunit;
 using Record = Naveego.Sdk.Plugins.Record;
 
@@ -19,7 +18,7 @@ namespace PluginODBCTest.Plugin
 {
     public class PluginTest
     {
-        private readonly Mock<IConnectionService> _mockOdbcConnection = new Mock<IConnectionService>();
+        private readonly Mock<IConnection> _mockOdbcConnection = new Mock<IConnection>();
 
         private ConnectRequest GetConnectSettings()
         {
@@ -32,120 +31,117 @@ namespace PluginODBCTest.Plugin
             };
         }
 
-        private Func<Settings, IConnectionFactoryService> GetMockConnectionFactory()
+        private IConnectionFactory GetMockConnectionFactory()
         {
-            return cs =>
-            {
-                var mockService = new Mock<IConnectionFactoryService>();
+            var mockService = new Mock<IConnectionFactory>();
 
-                mockService.Setup(m => m.MakeConnectionObject())
-                    .Returns(_mockOdbcConnection.Object);
+            mockService.Setup(m => m.GetConnection())
+                .Returns(_mockOdbcConnection.Object);
 
-                mockService.Setup(m => m.MakeCommandObject("DiscoverSchemas", _mockOdbcConnection.Object))
-                    .Returns(() =>
-                    {
-                        var mockOdbcCommand = new Mock<ICommandService>();
+            mockService.Setup(m => m.GetCommand("DiscoverSchemas", _mockOdbcConnection.Object))
+                .Returns(() =>
+                {
+                    var mockOdbcCommand = new Mock<ICommand>();
 
-                        mockOdbcCommand.Setup(c => c.ExecuteReader())
-                            .Returns(() =>
-                            {
-                                var mockReader = new Mock<IReaderService>();
+                    mockOdbcCommand.Setup(c => c.ExecuteReaderAsync())
+                        .Returns(() =>
+                        {
+                            var mockReader = new Mock<IReader>();
 
-                                mockReader.Setup(r => r.GetSchemaTable())
-                                    .Returns(() =>
-                                    {
-                                        var mockSchemaTable = new DataTable();
-                                        mockSchemaTable.Columns.AddRange(new[]
+                            mockReader.Setup(r => r.GetSchemaTable())
+                                .Returns(() =>
+                                {
+                                    var mockSchemaTable = new DataTable();
+                                    mockSchemaTable.Columns.AddRange(new[]
+                                        {
+                                            new DataColumn
                                             {
-                                                new DataColumn
-                                                {
-                                                    ColumnName = "ColumnName"
-                                                },
-                                                new DataColumn
-                                                {
-                                                    ColumnName = "DataType"
-                                                },
-                                                new DataColumn
-                                                {
-                                                    ColumnName = "IsKey"
-                                                },
-                                                new DataColumn
-                                                {
-                                                    ColumnName = "AllowDBNull"
-                                                },
-                                            }
-                                        );
+                                                ColumnName = "ColumnName"
+                                            },
+                                            new DataColumn
+                                            {
+                                                ColumnName = "DataType"
+                                            },
+                                            new DataColumn
+                                            {
+                                                ColumnName = "IsKey"
+                                            },
+                                            new DataColumn
+                                            {
+                                                ColumnName = "AllowDBNull"
+                                            },
+                                        }
+                                    );
 
-                                        var mockRow = mockSchemaTable.NewRow();
-                                        mockRow["ColumnName"] = "TestCol";
-                                        mockRow["DataType"] = "System.Int64";
-                                        mockRow["IsKey"] = true;
-                                        mockRow["AllowDBNull"] = false;
+                                    var mockRow = mockSchemaTable.NewRow();
+                                    mockRow["ColumnName"] = "TestCol";
+                                    mockRow["DataType"] = "System.Int64";
+                                    mockRow["IsKey"] = true;
+                                    mockRow["AllowDBNull"] = false;
 
-                                        mockSchemaTable.Rows.Add(mockRow);
+                                    mockSchemaTable.Rows.Add(mockRow);
 
 
-                                        return mockSchemaTable;
-                                    });
+                                    return mockSchemaTable;
+                                });
 
-                                return mockReader.Object;
-                            });
+                            return Task.FromResult(mockReader.Object);
+                        });
 
-                        return mockOdbcCommand.Object;
-                    });
+                    return mockOdbcCommand.Object;
+                });
 
-                mockService.Setup(m => m.MakeCommandObject("ReadStream", _mockOdbcConnection.Object))
-                    .Returns(() =>
-                    {
-                        var mockOdbcCommand = new Mock<ICommandService>();
+            mockService.Setup(m => m.GetCommand("ReadStream", _mockOdbcConnection.Object))
+                .Returns(() =>
+                {
+                    var mockOdbcCommand = new Mock<ICommand>();
 
-                        mockOdbcCommand.Setup(c => c.ExecuteReader())
-                            .Returns(() =>
-                            {
-                                var mockReader = new Mock<IReaderService>();
+                    mockOdbcCommand.Setup(c => c.ExecuteReaderAsync())
+                        .Returns(() =>
+                        {
+                            var mockReader = new Mock<IReader>();
 
-                                mockReader.Setup(r => r.HasRows)
-                                    .Returns(true);
+                            mockReader.Setup(r => r.HasRows())
+                                .Returns(true);
 
-                                var readToggle = new List<bool> {true, true, false};
-                                var readIndex = 0;
-                                mockReader.Setup(r => r.Read())
-                                    .Returns(() => readToggle[readIndex])
-                                    .Callback(() => readIndex++);
+                            var readToggle = new List<bool> {true, true, false};
+                            var readIndex = 0;
+                            mockReader.Setup(r => r.ReadAsync())
+                                .Returns(() => Task.FromResult(readToggle[readIndex]))
+                                .Callback(() => readIndex++);
 
-                                mockReader.Setup(r => r["TestCol"])
-                                    .Returns("data");
+                            mockReader.Setup(r => r.GetValueById("TestCol", '"'))
+                                .Returns("data");
 
-                                return mockReader.Object;
-                            });
+                            return Task.FromResult(mockReader.Object);
+                        });
 
-                        return mockOdbcCommand.Object;
-                    });
+                    return mockOdbcCommand.Object;
+                });
 
-                mockService.Setup(m => m.MakeCommandObject("WriteStream", _mockOdbcConnection.Object))
-                    .Returns(() =>
-                    {
-                        var mockOdbcCommand = new Mock<ICommandService>();
+            mockService.Setup(m => m.GetCommand("WriteStream", _mockOdbcConnection.Object))
+                .Returns(() =>
+                {
+                    var mockOdbcCommand = new Mock<ICommand>();
 
-                        mockOdbcCommand.Setup(c => c.ExecuteReader())
-                            .Returns(() =>
-                            {
-                                var mockReader = new Mock<IReaderService>();
+                    mockOdbcCommand.Setup(c => c.ExecuteNonQueryAsync())
+                        .Returns(() =>
+                        {
+                            // var mockReader = new Mock<IReader>();
 
-                                mockReader.Setup(r => r.RecordsAffected)
-                                    .Returns(1);
+                            // mockReader.Setup(r => r.RecordsAffected)
+                            //     .Returns(1);
 
-                                return mockReader.Object;
-                            });
+                            return Task.FromResult(1);
+                        });
 
-                        mockOdbcCommand.Setup(c => c.AddParameter("TestCol", OdbcType.Int))
-                            .Returns(new OdbcParameter());
+                    // mockOdbcCommand.Setup(c => c.AddParameter("TestCol", OdbcType.Int))
+                    //     .Returns(new OdbcParameter());
 
-                        return mockOdbcCommand.Object;
-                    });
+                    return mockOdbcCommand.Object;
+                });
 
-                return mockService.Object;
-            };
+            return mockService.Object;
         }
 
         private Schema GetTestSchema(string query)
