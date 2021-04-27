@@ -7,7 +7,7 @@ namespace PluginODBC.API.Write
 {
     public static partial class Write
     {
-        public static string GetSchemaJson(List<WriteStoredProcedure> storedProcedures)
+        public static string GetSchemaJson()
         {
             var schemaJsonObj = new Dictionary<string, object>
             {

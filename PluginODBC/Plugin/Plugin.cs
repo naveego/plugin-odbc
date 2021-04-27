@@ -334,9 +334,7 @@ namespace PluginODBC.Plugin
         {
             Logger.Info("Configuring write...");
 
-            var storedProcedures = await Write.GetAllStoredProceduresAsync(_connectionFactory);
-
-            var schemaJson = Write.GetSchemaJson(storedProcedures);
+            var schemaJson = Write.GetSchemaJson();
             var uiJson = Write.GetUIJson();
 
             // if first call 
