@@ -32,12 +32,6 @@
       "ui:order": ["ConnectionString", "Password"],
       "Password": {
         "ui:widget": "password"
-      },
-      "PrePublishQuery": {
-        "ui:widget": "textarea"
-      },
-      "PostPublishQuery": {
-        "ui:widget": "textarea"
       }
     },
     "schema": {

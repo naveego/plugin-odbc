@@ -70,7 +70,7 @@ namespace PluginODBC.API.Discover
                 schema.Properties.AddRange(properties);
 
                 // get sample and count
-                yield return await AddSampleAndCount(connFactory, schema, sampleSize);
+                yield return schema;
             }
 
             await conn.CloseAsync();

@@ -59,7 +59,7 @@ namespace PluginODBC.Plugin
         }
 
         /// <summary>
-        /// Establishes a connection with Fiserv Signature Core.
+        /// Establishes a connection with ODBC.
         /// </summary>
         /// <param name="request"></param>
         /// <param name="context"></param>
@@ -170,7 +170,7 @@ namespace PluginODBC.Plugin
 
 
         /// <summary>
-        /// Discovers schemas located in the users Fiserv Signature Core database
+        /// Discovers schemas located in the users ODBC database
         /// </summary>
         /// <param name="request"></param>
         /// <param name="context"></param>
@@ -414,7 +414,7 @@ namespace PluginODBC.Plugin
         }
 
         /// <summary>
-        /// Configures replication writebacks to Fiserv Signature Core
+        /// Configures replication writebacks to ODBC
         /// </summary>
         /// <param name="request"></param>
         /// <param name="context"></param>
@@ -470,7 +470,7 @@ namespace PluginODBC.Plugin
         }
 
         /// <summary>
-        /// Prepares writeback settings to write to Fiserv Signature Core
+        /// Prepares writeback settings to write to ODBC
         /// </summary>
         /// <param name="request"></param>
         /// <param name="context"></param>
@@ -516,7 +516,7 @@ namespace PluginODBC.Plugin
         }
 
         /// <summary>
-        /// Writes records to Fiserv Signature Core
+        /// Writes records to ODBC
         /// </summary>
         /// <param name="requestStream"></param>
         /// <param name="responseStream"></param>
@@ -527,7 +527,7 @@ namespace PluginODBC.Plugin
         {
             try
             {
-                Logger.Info("Writing records to Fiserv Signature Core...");
+                Logger.Info("Writing records to ODBC...");
 
                 var schema = _server.WriteSettings.Schema;
                 var inCount = 0;
@@ -566,7 +566,7 @@ namespace PluginODBC.Plugin
                     }
                 }
 
-                Logger.Info($"Wrote {inCount} records to Fiserv Signature Core.");
+                Logger.Info($"Wrote {inCount} records to ODBC.");
             }
             catch (Exception e)
             {

@@ -16,19 +16,19 @@ namespace PluginODBC.API.Replication
                     {
                         {"type", "string"},
                         {"title", "Schema Name"},
-                        {"description", "Name of schema to put golden and version tables into in Fiserv Signature Core"},
+                        {"description", "Name of schema to put golden and version tables into in ODBC"},
                     }},
                     {"GoldenTableName", new Dictionary<string, string>
                     {
                         {"type", "string"},
                         {"title", "Golden Record Table Name"},
-                        {"description", "Name for your golden record table in Fiserv Signature Core"},
+                        {"description", "Name for your golden record table in ODBC"},
                     }},
                     {"VersionTableName", new Dictionary<string, string>
                     {
                         {"type", "string"},
                         {"title", "Version Record Bucket Name"},
-                        {"description", "Name for your version record table in Fiserv Signature Core"},
+                        {"description", "Name for your version record table in ODBC"},
                     }},
                 }},
                 {"required", new []
