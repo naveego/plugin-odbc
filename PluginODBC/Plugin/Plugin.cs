@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Grpc.Core;
+using Naveego.Sdk.Logging;
 using Naveego.Sdk.Plugins;
 using Newtonsoft.Json;
 using PluginODBC.API;
@@ -620,6 +621,14 @@ namespace PluginODBC.Plugin
                     var exception = new Exception("query is null");
                     Logger.Error(exception, exception.Message, context);
                     return null;
+                }
+                
+                // check if sample size is 0 and properties is greater than 0
+                // if zero return existing schema to avoid running potentially large queries
+                // allow to run if properties length is not greater than 0
+                if (sampleSize == 0 && schema.Properties.Count > 0)
+                {
+                    return Task.FromResult(schema);
                 }
 
                 // create new db connection and command

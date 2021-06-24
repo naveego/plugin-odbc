@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using Grpc.Core;
+using Naveego.Sdk.Logging;
 using Naveego.Sdk.Plugins;
 using PluginODBC.Helper;
 
