@@ -78,7 +78,7 @@ namespace PluginODBC.Plugin
             }
             catch (Exception e)
             {
-                Logger.Error(e, e.Message, context);
+                Logger.Error(e, e.Message);
                 return Task.FromResult(new ConnectResponse
                 {
                     OauthStateJson = request.OauthStateJson,
@@ -99,7 +99,7 @@ namespace PluginODBC.Plugin
             }
             catch (Exception e)
             {
-                Logger.Error(e, e.Message, context);
+                Logger.Error(e, e.Message);
                 return Task.FromResult(new ConnectResponse
                 {
                     OauthStateJson = request.OauthStateJson,
