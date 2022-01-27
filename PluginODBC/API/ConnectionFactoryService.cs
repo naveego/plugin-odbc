@@ -21,7 +21,7 @@ namespace PluginODBC.API
 
         public ICommandService MakeCommandObject(string query, IConnectionService connection)
         {
-            return new CommandService(new OdbcCommand(query, connection.Connection));
+            return new CommandService(new OdbcCommand(query, connection.Connection) {CommandTimeout = _settings.QueryTimeout});
         }
     }
 }

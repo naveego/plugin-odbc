@@ -6,6 +6,7 @@ namespace PluginODBC.Helper
     {
         public string ConnectionString { get; set; }
         public string Password { get; set; }
+        public int QueryTimeout { get; set; } = 30;
         public string PrePublishQuery { get; set; }
         public string PostPublishQuery { get; set; }
 

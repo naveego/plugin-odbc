@@ -29,7 +29,7 @@
   },
   "configSchema": {
     "ui": {
-      "ui:order": ["ConnectionString", "Password", "PrePublishQuery", "PostPublishQuery"],
+      "ui:order": ["ConnectionString", "Password", "QueryTimeout", "PrePublishQuery", "PostPublishQuery"],
       "Password": {
         "ui:widget": "password"
       },
@@ -52,6 +52,12 @@
           "type": "string",
           "title": "Password",
           "description": "(Optional) The secret of your connection string. Will replace PASSWORD in the connection string."
+        },
+        "QueryTimeout": {
+          "type": "number",
+          "title": "Query Timeout",
+          "description": "(Optional) The query timeout to use in seconds.",
+          "default": 30
         },
         "PrePublishQuery": {
           "type": "string",
