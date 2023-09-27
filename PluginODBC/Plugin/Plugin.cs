@@ -781,21 +781,28 @@ namespace PluginODBC.Plugin
                 {
                     try
                     {
-                        switch (property.Type)
+                        if (reader[property.Id] == DBNull.Value) 
                         {
-                            case PropertyType.String:
-                                recordMap[property.Id] = reader[property.Id].ToString();
-                                break;
-                            default:
-                                recordMap[property.Id] = reader[property.Id];
-                                break;
+                            recordMap[property.Id] = null;
+                        }
+                        else 
+                        {
+                            switch (property.Type)
+                            {
+                                case PropertyType.String:
+                                    recordMap[property.Id] = reader[property.Id].ToString();
+                                    break;
+                                default:
+                                    recordMap[property.Id] = reader[property.Id];
+                                    break;
+                            }
                         }
                     }
                     catch (Exception e)
                     {
                         Logger.Error(e, $"No column with property Id: {property.Id}");
                         Logger.Error(e, e.Message);
-                        recordMap[property.Id] = "";
+                        recordMap[property.Id] = null;
                     }
                 }
 
